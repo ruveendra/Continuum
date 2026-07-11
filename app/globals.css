@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/*
+  Theme tokens
+  These values define the app-wide background, foreground, and font variables.
+*/
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -19,6 +23,10 @@
   }
 }
 
+/*
+  Base document layout
+  Keep the root document full height and remove default browser spacing.
+*/
 html,
 body {
   height: 100%;
@@ -38,48 +46,65 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.ProseMirror {
-  min-height: 100%;
-  height: 100%;
-  width: 100%;
+/*
+  Page shell
+  This wrapper fills the viewport and provides the editor's outer canvas.
+*/
+.page-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #ffffff;
   box-sizing: border-box;
-  padding: 1.5rem;
-  outline: none;
 }
 
-.ProseMirror p.is-editor-empty:first-child::before {
-  color: #a1a1aa;
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
+/*
+  Editor shell
+  This is the visible frame around the Tiptap editor area.
+*/
 .editor-shell {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   flex-direction: column;
-  border-radius: 1rem;
+  border-radius: 0;
   border: 1px solid #e4e4e7;
   background: #ffffff;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   color: #000000;
 }
 
+/*
+  Editor content container
+  This element stretches to fill the editor shell and hosts the ProseMirror surface.
+*/
 .editor-content {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  flex: 1 1 auto;
 }
 
+/*
+  Tiptap / ProseMirror surface
+  These rules ensure the editable region fills the available height and keeps text black.
+*/
 .editor-content .ProseMirror {
   min-height: 100%;
   height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  outline: none;
   color: #000000;
   caret-color: #000000;
 }
 
+/*
+  Placeholder text
+  This pseudo-element shows helper text only while the editor is empty.
+*/
 .editor-content .ProseMirror p.is-editor-empty:first-child::before {
   color: #a1a1aa;
   content: attr(data-placeholder);
