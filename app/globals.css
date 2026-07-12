@@ -285,9 +285,13 @@ body {
   border-radius: 2px;
   transition: background 0.15s ease;
 }
-.ai-session-loading { background: rgb(250 204 21 / 0.25); }
-.ai-session-success { background: rgb(74 222 128 / 0.25); }
+.ai-session-loading { background: rgb(24 24 27 / 0.12); }
+.ai-session-success { background: rgb(24 24 27 / 0.12); }
 .ai-session-error { background: rgb(248 113 113 / 0.25); }
+.ai-pending-highlight {
+  background: rgb(24 24 27 / 0.12);
+  border-radius: 2px;
+}
 
 .selection-tooltip {
   display: flex;

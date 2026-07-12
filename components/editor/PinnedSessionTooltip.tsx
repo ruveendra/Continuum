@@ -27,8 +27,7 @@ export default function PinnedSessionTooltip({ editor, session }: Props) {
   });
 
   useEffect(() => {
-    // Ask for the LIVE position (tracks document edits), falling back to
-    // the session's originally-stored from/to only if something goes wrong.
+  const updatePosition = () => {
     const range = getLiveSessionRange(editor, session.id) ?? session;
 
     const start = editor.view.coordsAtPos(range.from);
@@ -43,10 +42,18 @@ export default function PinnedSessionTooltip({ editor, session }: Props) {
 
     setRect(newRect);
     refs.setReference({ getBoundingClientRect: () => newRect });
-    // NOTE: this only runs when `session` changes (i.e. its status updates).
-    // It does NOT live-track position if you keep typing elsewhere while
-    // this is open — a known simplification, fine for now.
-  }, [editor, session, refs]);
+  };
+
+  updatePosition(); // run once immediately, same as before
+
+  // NEW: also re-run on every editor transaction, so the tooltip tracks
+  // the highlight's live-remapped position instead of freezing at its
+  // original spot.
+  editor.on("transaction", updatePosition);
+  return () => {
+    editor.off("transaction", updatePosition);
+  };
+}, [editor, session, refs]);
 
   const handleReject = () => removeSession(session.id); // just remove — document is untouched
   const handleAccept = () => {
