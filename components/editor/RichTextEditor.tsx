@@ -10,9 +10,13 @@ import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import { useEffect, useState, useMemo } from 'react'
+import { useEditorStore } from '@/lib/editor/editorStore'
+import { getEditorSelection } from '@/lib/editor/selection'
 
 // Inner component: only ever mounted once ydoc is guaranteed non-null
 function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
+  const setSelection = useEditorStore((state) => state.setSelection) //temp
+
   const extensions = useMemo(() => [
     StarterKit.configure({
       bulletList: {
@@ -36,6 +40,9 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
   const editor = useEditor({
     extensions,
     immediatelyRender: false,
+    onSelectionUpdate: ({ editor }) => {
+      setSelection(getEditorSelection(editor))
+    },
   })
 
   if (!editor) return null;
