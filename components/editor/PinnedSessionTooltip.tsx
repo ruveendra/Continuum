@@ -10,35 +10,48 @@ import type { AISession } from "@/types/ai";
 
 type Props = { editor: Editor; session: AISession };
 
+// Unlike SelectionTooltip (one instance, follows the live cursor), THIS
+// component gets rendered ONCE PER ACTIVE SESSION (see the .map() in
+// RichTextEditor.tsx) — so if you have 3 pending AI suggestions, there are
+// 3 separate instances of this component on screen simultaneously, each
+// anchored to its own piece of text.
 export default function PinnedSessionTooltip({ editor, session }: Props) {
   const removeSession = useAISessionStore((s) => s.removeSession);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const { refs, floatingStyles } = useFloating({
     open: rect !== null,
-    placement: "bottom",
+    placement: "bottom", // pinned tooltips sit BELOW their text (live tooltip is above) so they don't visually collide
     middleware: [offset(8), flip(), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   });
 
   useEffect(() => {
+    // Ask for the LIVE position (tracks document edits), falling back to
+    // the session's originally-stored from/to only if something goes wrong.
     const range = getLiveSessionRange(editor, session.id) ?? session;
+
     const start = editor.view.coordsAtPos(range.from);
     const end = editor.view.coordsAtPos(range.to);
+
     const newRect = new DOMRect(
       Math.min(start.left, end.left),
       Math.min(start.top, end.top),
       Math.abs(end.right - start.left),
       Math.max(start.bottom, end.bottom) - Math.min(start.top, end.top)
     );
+
     setRect(newRect);
     refs.setReference({ getBoundingClientRect: () => newRect });
+    // NOTE: this only runs when `session` changes (i.e. its status updates).
+    // It does NOT live-track position if you keep typing elsewhere while
+    // this is open — a known simplification, fine for now.
   }, [editor, session, refs]);
 
-  const handleReject = () => removeSession(session.id);
+  const handleReject = () => removeSession(session.id); // just remove — document is untouched
   const handleAccept = () => {
-    applySessionAccept(editor, session);
-    removeSession(session.id);
+    applySessionAccept(editor, session); // actually replace the text in the document
+    removeSession(session.id);            // then remove the session — its job is done
   };
 
   return (

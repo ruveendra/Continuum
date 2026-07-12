@@ -19,6 +19,11 @@ import PinnedSessionTooltip from './PinnedSessionTooltip'
 
 function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
   const setSelection = useEditorStore((state) => state.setSelection)
+
+  // Subscribing to `sessions` here means THIS component re-renders whenever
+  // the session list changes (added/removed/status updated) — which is
+  // exactly what we need, since we .map() over sessions below to render one
+  // PinnedSessionTooltip per session.
   const sessions = useAISessionStore((state) => state.sessions)
 
   const extensions = useMemo(() => [
@@ -32,7 +37,7 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
       showOnlyCurrent: false,
     }),
     Collaboration.configure({ document: ydoc }),
-    SessionHighlight,
+    SessionHighlight, // registers our custom highlight plugin with Tiptap
   ], [ydoc])
 
   const editor = useEditor({
@@ -43,13 +48,20 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
     },
   })
 
-  // Force the highlight decoration plugin to rebuild whenever sessions change
+  // This is the bridge between Zustand (outside ProseMirror) and the
+  // highlight plugin (inside ProseMirror) — see the long comment in
+  // highlightExtension.ts for why this is necessary. Every time ANY session
+  // changes, we dispatch an essentially "no-op" transaction carrying a
+  // special flag (setMeta), which the plugin's `apply` function checks for
+  // to know "please rebuild your decorations from the current session list."
   useEffect(() => {
     if (!editor) return
     const unsubscribe = useAISessionStore.subscribe(() => {
-      editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+      editor.view.dispatch(
+        editor.state.tr.setMeta(sessionHighlightPluginKey, true)
+      )
     })
-    return unsubscribe
+    return unsubscribe // cleanup on unmount, avoids a memory leak / stale subscription
   }, [editor])
 
   if (!editor) return null;
@@ -58,7 +70,12 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
     <div className="editor-shell">
       <Toolbar editor={editor} />
       <EditorContent editor={editor} className="editor-content" />
+
+      {/* The live tooltip — always present, only visibly renders when there's a selection */}
       <SelectionTooltip editor={editor} />
+
+      {/* One pinned tooltip per active session — this is how multiple
+          concurrent AI suggestions each get their own persistent UI */}
       {sessions.map((session) => (
         <PinnedSessionTooltip key={session.id} editor={editor} session={session} />
       ))}

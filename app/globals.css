@@ -289,6 +289,15 @@ body {
 .ai-session-success { background: rgb(74 222 128 / 0.25); }
 .ai-session-error { background: rgb(248 113 113 / 0.25); }
 
+.selection-tooltip {
+  display: flex;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  background: #18181b;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+  z-index: 50;
+}
+
 .selection-tooltip-form {
   display: flex;
   gap: 0.25rem;

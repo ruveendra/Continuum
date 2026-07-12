@@ -14,6 +14,11 @@ import { requestAIEdit } from "@/lib/ai/client";
 
 type Props = { editor: Editor };
 
+// This is the "LIVE" tooltip — it follows whatever text is CURRENTLY
+// selected, and its only job is to let the user type an instruction and
+// CREATE a new session. Once a session is created, this component's job is
+// done for that piece of text — a separate, PINNED tooltip
+// (PinnedSessionTooltip) takes over showing that session's progress.
 export default function SelectionTooltip({ editor }: Props) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [instruction, setInstruction] = useState("");
@@ -22,27 +27,41 @@ export default function SelectionTooltip({ editor }: Props) {
   const addSession = useAISessionStore((s) => s.addSession);
   const updateSession = useAISessionStore((s) => s.updateSession);
 
+  // useFloating is Floating UI's core hook — it calculates WHERE the
+  // tooltip should render relative to a "reference" point, applying the
+  // middleware rules below.
   const { refs, floatingStyles } = useFloating({
     open: rect !== null,
-    placement: "top",
-    middleware: [offset(8), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
+    placement: "top", // prefer showing above the selection
+    middleware: [
+      offset(8),              // 8px gap so the tooltip isn't glued to the text
+      flip(),                  // if there's no room above, flip to below automatically
+      shift({ padding: 8 }),  // nudge sideways to stay within the viewport near screen edges
+    ],
+    whileElementsMounted: autoUpdate, // keep position correct on scroll/resize
   });
 
   useEffect(() => {
     const updateRect = () => {
       const selectionRect = getSelectionRect(editor);
       setRect(selectionRect);
-      setCapReached(false);
+      setCapReached(false); // reset any old warning whenever selection changes
+
       if (selectionRect) {
+        // Floating UI normally positions against a real DOM element. We
+        // don't have one — we only have pixel coordinates from ProseMirror.
+        // Floating UI supports this via a "virtual element": any object
+        // with a getBoundingClientRect() method works as a reference,
+        // real DOM node or not.
         refs.setReference({ getBoundingClientRect: () => selectionRect });
       } else {
-        setInstruction("");
+        setInstruction(""); // clear the input once selection is gone
       }
     };
+
     editor.on("selectionUpdate", updateRect);
     return () => {
-      editor.off("selectionUpdate", updateRect);
+      editor.off("selectionUpdate", updateRect); // cleanup: avoid duplicate listeners on re-render
     };
   }, [editor, refs]);
 
@@ -52,6 +71,8 @@ export default function SelectionTooltip({ editor }: Props) {
     const selection = getEditorSelection(editor);
     if (selection.isEmpty) return;
 
+    // Snapshot everything we know about this selection AT THIS MOMENT —
+    // this becomes the new session object.
     const session = {
       id: crypto.randomUUID(),
       from: selection.from,
@@ -60,17 +81,18 @@ export default function SelectionTooltip({ editor }: Props) {
       originalNodeType: getSelectionNodeType(editor),
       originalNodeAttrs: getSelectionNodeAttrs(editor),
       instruction,
-      status: "loading" as const,
+      status: "loading" as const, // "as const" tells TS this is literally the string "loading", not just any string
       createdAt: Date.now(),
     };
 
     if (!addSession(session)) {
+      // addSession returned false = we're already at MAX_SESSIONS
       setCapReached(true);
       return;
     }
 
     setInstruction("");
-    setRect(null); // hand off to the pinned tooltip
+    setRect(null); // hide THIS tooltip — the pinned tooltip takes over from here
 
     try {
       const resultText = await requestAIEdit(session.originalText, session.instruction);
@@ -80,12 +102,14 @@ export default function SelectionTooltip({ editor }: Props) {
     }
   };
 
-  if (!rect) return null;
+  if (!rect) return null; // nothing selected = render nothing
 
   return (
     <div ref={refs.setFloating} style={floatingStyles} className="selection-tooltip">
       {capReached ? (
-        <div className="cap-warning">Max {MAX_SESSIONS} active suggestions — resolve one first.</div>
+        <div className="cap-warning">
+          Max {MAX_SESSIONS} active suggestions — resolve one first.
+        </div>
       ) : (
         <div className="selection-tooltip-form">
           <input
