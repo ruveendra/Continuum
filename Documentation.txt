@@ -1,0 +1,38 @@
+1. types/ai.ts — the "shape" of a suggestion
+This just defines what information we keep about one AI suggestion: which text it's about, what the user asked for, whether it's still thinking/done/failed, and what the AI said back. Think of it as a form template — every session fills in the same blanks.
+
+2. lib/editor/selection.ts — reading what's selected
+Four small helper functions that all answer questions about the current text selection:
+
+What text is selected? (plain words, no formatting)
+Where on screen is it? (so we know where to draw a popup)
+What kind of text is it? (a heading? a normal paragraph?)
+What are its specific details? (which heading level — H1, H2, etc.)
+
+Nothing here changes anything — it's all just "go look and tell me."
+
+3. lib/ai/aiSessionStore.ts — the shared list of active suggestions
+This is just a list (max 4 items) sitting in memory, plus three simple actions: add one, update one, remove one. Any component in the app can check this list or change it. It's the single "source of truth" for what suggestions currently exist.
+
+4. lib/editor/highlightExtension.ts — the yellow/green highlighter
+This is what paints the colored background behind text that has an active suggestion. The clever part: normal highlighting would break if you typed new words above it — the highlighted spot would end up in the wrong place. This version is glued to ProseMirror's internals so it automatically follows the right text no matter what else changes in the document above or below it.
+
+5. lib/editor/sessionPositions.ts — "where is this suggestion, right now?"
+Each session remembers where its text was when it was created, but if you keep typing, that original position becomes wrong. This file always asks the highlighter (set 4) for the current correct position instead of trusting the old saved one. Anything that needs an accurate location uses this.
+
+6. lib/ai/client.ts — the (fake, for now) AI call
+Right now this doesn't actually call any AI — it just waits a second and echoes your instruction back next to the original text, like a placeholder. It exists so we can test the whole flow before wiring up a real AI service in Step 4. When we do connect a real AI, this is the only file that needs to change.
+
+7. lib/editor/document.ts — actually replacing the text (Accept)
+When you hit Accept, this is what deletes the old text and puts the new text in its place — while keeping it the same type of content (heading stays a heading, paragraph stays a paragraph) instead of flattening everything into plain text.
+
+8. SelectionTooltip.tsx — the popup that appears when you select text
+This is the little box with a text input that shows up right when you highlight something. Its only job: let you type an instruction and, when you hit submit, create a new suggestion (adding it to the list from set 3). Once submitted, this popup disappears — its job is done — and hands off to the next piece.
+
+9. PinnedSessionTooltip.tsx — the popup that shows a suggestion's progress
+This is a separate popup type, one for each active suggestion. It shows "Thinking…" while waiting, then shows the AI's result with Accept/Reject buttons once done. Because it's tied to a specific suggestion (not "whatever's currently selected"), it stays in place even after you click away and select something else — which is what lets you have several of these open at once.
+
+10. RichTextEditor.tsx — the glue that holds it all together
+This is the main component. It sets up the editor itself, turns on the highlighter, shows the "type your instruction" popup (set 8), and — this is the key line — draws one "progress" popup (set 9) for every suggestion currently in the list (set 3). It also contains one small but important trick: since the highlighter (set 4) and the suggestion list (set 3) are technically two separate systems that don't automatically talk to each other, this file manually tells the highlighter "hey, the list changed, please redraw yourself" every time a suggestion is added, updated, or removed.
+
+The one-sentence version of the whole thing: selecting text creates an entry in a list; the app draws a highlighted region and a status popup for every entry in that list; accepting an entry edits the real document, rejecting just deletes the entry.
