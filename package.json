@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.20",
+    "@google/genai": "^2.11.0",
     "@tiptap/extension-collaboration": "^3.27.3",
     "@tiptap/extension-collaboration-cursor": "^3.0.0",
     "@tiptap/extension-placeholder": "^3.27.3",
