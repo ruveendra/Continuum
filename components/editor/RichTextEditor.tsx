@@ -12,29 +12,27 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import { useEffect, useState, useMemo } from 'react'
 import { useEditorStore } from '@/lib/editor/editorStore'
 import { getEditorSelection } from '@/lib/editor/selection'
+import { SessionHighlight, sessionHighlightPluginKey } from '@/lib/editor/highlightExtension'
+import { useAISessionStore } from '@/lib/ai/aiSessionStore'
+import SelectionTooltip from './SelectionTooltip'
+import PinnedSessionTooltip from './PinnedSessionTooltip'
 
-// Inner component: only ever mounted once ydoc is guaranteed non-null
 function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
-  const setSelection = useEditorStore((state) => state.setSelection) //temp
+  const setSelection = useEditorStore((state) => state.setSelection)
+  const sessions = useAISessionStore((state) => state.sessions)
 
   const extensions = useMemo(() => [
     StarterKit.configure({
-      bulletList: {
-        keepMarks: true,
-        keepAttributes: false,
-      },
+      bulletList: { keepMarks: true, keepAttributes: false },
     }),
-    TextAlign.configure({
-      types: ["heading", "paragraph"],
-    }),
+    TextAlign.configure({ types: ["heading", "paragraph"] }),
     Placeholder.configure({
       placeholder: "Type here...",
       showOnlyWhenEditable: true,
       showOnlyCurrent: false,
     }),
-    Collaboration.configure({
-      document: ydoc,
-    }),
+    Collaboration.configure({ document: ydoc }),
+    SessionHighlight,
   ], [ydoc])
 
   const editor = useEditor({
@@ -45,37 +43,43 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
     },
   })
 
+  // Force the highlight decoration plugin to rebuild whenever sessions change
+  useEffect(() => {
+    if (!editor) return
+    const unsubscribe = useAISessionStore.subscribe(() => {
+      editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+    })
+    return unsubscribe
+  }, [editor])
+
   if (!editor) return null;
 
   return (
     <div className="editor-shell">
       <Toolbar editor={editor} />
       <EditorContent editor={editor} className="editor-content" />
+      <SelectionTooltip editor={editor} />
+      {sessions.map((session) => (
+        <PinnedSessionTooltip key={session.id} editor={editor} session={session} />
+      ))}
     </div>
   )
 }
 
-// Outer component: owns the Yjs lifecycle
 export function RichTextEditor() {
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
 
   useEffect(() => {
     const doc = new Y.Doc()
-    const websocketProvider = new WebsocketProvider(
-      'ws://localhost:1234',
-      'continuum-room',
-      doc
-    )
+    const websocketProvider = new WebsocketProvider('ws://localhost:1234', 'continuum-room', doc)
     const idbProvider = new IndexeddbPersistence('continuum-room', doc)
 
     websocketProvider.on('status', (event: any) => {
       console.log('WebSocket status:', event.status)
     })
-
     websocketProvider.on('connection-error', (error: any) => {
       console.error('WebSocket connection error:', error)
     })
-
     idbProvider.whenSynced.then(() => {
       console.log('Loaded data from IndexedDB')
     })
