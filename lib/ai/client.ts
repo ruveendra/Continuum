@@ -1,9 +1,18 @@
-// This is a placeholder that FAKES an AI response so we can build and test
-// the whole session/UI flow before wiring up a real API call. The function
-// SIGNATURE (what goes in, what comes out) is what actually matters here —
-// Step 4 will swap the implementation for a real fetch() to app/api/ai,
-// but nothing that CALLS this function should need to change.
+// Calls our own /api/ai route handler, which in turn calls Gemini.
+// Signature is unchanged from the stub version — anything calling
+// requestAIEdit() doesn't need to know or care that this now hits a
+// real network endpoint instead of faking a response.
 export async function requestAIEdit(text: string, instruction: string): Promise<string> {
-  await new Promise((resolve) => setTimeout(resolve, 1000)); // simulate network delay
-  return `[${instruction}] ${text}`;
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, instruction }),
+  });
+
+  if (!response.ok) {
+    throw new Error("AI request failed");
+  }
+
+  const data = await response.json();
+  return data.resultText;
 }
