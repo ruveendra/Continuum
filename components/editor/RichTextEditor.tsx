@@ -99,7 +99,11 @@ export function RichTextEditor({ onEditorReady }: Props) {
 
   useEffect(() => {
     const doc = new Y.Doc()
-    const websocketProvider = new WebsocketProvider('ws://localhost:1234', 'continuum-room', doc)
+    const websocketProvider = new WebsocketProvider(
+      process.env.NEXT_PUBLIC_SYNC_SERVER_URL || 'ws://localhost:1234',
+      'continuum-room',
+      doc
+    )
     const idbProvider = new IndexeddbPersistence('continuum-room', doc)
 
     websocketProvider.on('status', (event: any) => {
