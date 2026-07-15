@@ -656,3 +656,41 @@ body {
   background: #18181b;
   color: white;
 }
+
+/* editor shell */
+
+.editor-shell-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-shell-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.chat-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e4e4e7;
+  background: #ffffff;
+  color: #000000;
+}
+
+.chat-panel-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e4e4e7;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.chat-panel-body {
+  flex: 1;
+  padding: 0.75rem;
+  color: #71717a;
+  font-size: 0.875rem;
+}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import TopBar from "./TopBar";
-import RichTextEditor from "@/components/editor/RichTextEditor";
+import EditorShell from "@/components/editor/EditorShell";
 import PersonalizeView from "@/components/personalize/PersonalizeView";
 
 // The two possible views. Using a union type (not just `string`) means
@@ -20,7 +20,7 @@ export default function AppShell() {
       <TopBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div className="app-shell-content">
-        {activeTab === "editor" && <RichTextEditor />}
+        {activeTab === "editor" && <EditorShell />}
         {activeTab === "personalize" && <PersonalizeView />}
       </div>
     </div>
