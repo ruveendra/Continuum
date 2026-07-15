@@ -58,3 +58,26 @@ export function insertTextAtCursor(editor: Editor, text: string) {
     .insertContentAt(from, text)
     .run();
 }
+
+// Reject: remove the AI-inserted text, and if there WAS pre-existing
+// content before it (originalText non-empty), put that back exactly
+// where it was. No-op insert if originalText is "".
+export function rejectChatGeneration(editor: Editor, from: number, to: number, originalText: string) {
+  editor
+    .chain()
+    .focus()
+    .deleteRange({ from, to })
+    .insertContentAt(from, originalText)
+    .run();
+}
+
+// Edit-again: replace the CURRENT pending range with newly generated text,
+// instead of inserting fresh content at the cursor.
+export function replaceChatGeneration(editor: Editor, from: number, to: number, newText: string) {
+  editor
+    .chain()
+    .focus()
+    .deleteRange({ from, to })
+    .insertContentAt(from, newText)
+    .run();
+}

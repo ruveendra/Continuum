@@ -16,7 +16,7 @@ import { SessionHighlight, sessionHighlightPluginKey } from '@/lib/editor/highli
 import { useAISessionStore } from '@/lib/ai/aiSessionStore'
 import SelectionTooltip from './SelectionTooltip'
 import PinnedSessionTooltip from './PinnedSessionTooltip'
-
+import { useChatStore } from '@/lib/chat/chatStore'
 
 
 function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (editor: Editor) => void }) {
@@ -61,14 +61,18 @@ function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (e
   // special flag (setMeta), which the plugin's `apply` function checks for
   // to know "please rebuild your decorations from the current session list."
   useEffect(() => {
-    if (!editor) return
-    const unsubscribe = useAISessionStore.subscribe(() => {
-      editor.view.dispatch(
-        editor.state.tr.setMeta(sessionHighlightPluginKey, true)
-      )
-    })
-    return unsubscribe // cleanup on unmount, avoids a memory leak / stale subscription
-  }, [editor])
+  if (!editor) return
+  const unsubscribeSessions = useAISessionStore.subscribe(() => {
+    editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+  })
+  const unsubscribeChat = useChatStore.subscribe(() => {
+    editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+  })
+  return () => {
+    unsubscribeSessions()
+    unsubscribeChat()
+  }
+}, [editor])
 
   if (!editor) return null;
 
