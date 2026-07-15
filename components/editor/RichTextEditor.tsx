@@ -17,6 +17,7 @@ import { useAISessionStore } from '@/lib/ai/aiSessionStore'
 import SelectionTooltip from './SelectionTooltip'
 import PinnedSessionTooltip from './PinnedSessionTooltip'
 import { useChatStore } from '@/lib/chat/chatStore'
+import ChatGenerationTooltip from './ChatGenerationTooltip'
 
 
 function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (editor: Editor) => void }) {
@@ -83,6 +84,7 @@ function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (e
 
       {/* The live tooltip — always present, only visibly renders when there's a selection */}
       <SelectionTooltip editor={editor} />
+      <ChatGenerationTooltip editor={editor} />
 
       {/* One pinned tooltip per active session — this is how multiple
           concurrent AI suggestions each get their own persistent UI */}
