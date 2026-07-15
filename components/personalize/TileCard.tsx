@@ -8,11 +8,12 @@ type Props = {
   tile: PersonalizeTile;
   isActive: boolean;
   onApply: () => void;
+  onUnapply: () => void;
   onEdit: () => void;
   onDelete: () => void;
 };
 
-export default function TileCard({ tile, isActive, onApply, onEdit, onDelete }: Props) {
+export default function TileCard({ tile, isActive, onApply, onUnapply, onEdit, onDelete }: Props) {
   // Tracks whether the delete confirmation modal is currently open for
   // THIS specific tile card.
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -39,8 +40,8 @@ export default function TileCard({ tile, isActive, onApply, onEdit, onDelete }: 
       <p className="tile-card-preview">{tile.prompt || "No prompt written yet"}</p>
 
       <div className="tile-card-actions">
-        <button type="button" onClick={onApply}>
-          {isActive ? "Applied" : "Apply"}
+        <button type="button" onClick={isActive ? onUnapply : onApply}>
+          {isActive ? "Unapply" : "Apply"}
         </button>
         <button type="button" onClick={onEdit}>
           Edit
