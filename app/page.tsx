@@ -1,9 +1,9 @@
-import RichTextEditor from "@/components/editor/RichTextEditor";
+import AppShell from "@/components/layout/AppShell";
 
 export default function Home() {
   return (
     <div className="page-shell">
-      <RichTextEditor />
+      <AppShell />
     </div>
   );
 }

@@ -48,3 +48,13 @@ export function applySessionAccept(editor: Editor, session: AISession) {
       .run();
   }
 }
+
+export function insertTextAtCursor(editor: Editor, text: string) {
+  const { from } = editor.state.selection;
+
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(from, text)
+    .run();
+}
