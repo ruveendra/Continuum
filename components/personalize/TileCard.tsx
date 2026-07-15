@@ -40,10 +40,10 @@ export default function TileCard({ tile, isActive, onApply, onUnapply, onEdit, o
       <p className="tile-card-preview">{tile.prompt || "No prompt written yet"}</p>
 
       <div className="tile-card-actions">
-        <button type="button" onClick={isActive ? onUnapply : onApply}>
-          {isActive ? "Unapply" : "Apply"}
+        <button type="button" className="tile-card-apply" onClick={isActive ? onUnapply : onApply}>
+          {isActive ? "Remove" : "Apply"}
         </button>
-        <button type="button" onClick={onEdit}>
+        <button type="button" className="tile-card-edit" onClick={onEdit}>
           Edit
         </button>
       </div>

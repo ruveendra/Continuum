@@ -377,29 +377,32 @@ body {
   justify-content: center;
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #e4e4e7;
-  background: #fff;
+  border-bottom: 1px solid #3f3f46;
+  background: #2b2b30;
   flex-shrink: 0;
 }
 
 .top-bar button {
+  min-width: 110px;
   padding: 0.375rem 0.75rem;
   border: none;
   border-radius: 0.5rem;
   background: transparent;
   cursor: pointer;
   font-size: 0.875rem;
+  color: rgb(255 255 255 / 0.7);
+  text-align: center;
 }
 
 .top-bar button:hover {
-  background: #f4f4f5;
-}
-
-.top-bar button.active {
-  background: #18181b;
+  background: rgb(255 255 255 / 0.1);
   color: white;
 }
 
+.top-bar button.active {
+  background: white;
+  color: #3f3f46;
+}
 
 /* Personalize styles */
 
@@ -413,6 +416,7 @@ body {
 .personalize-header {
   display: flex;
   align-items: center;
+  color: #71717a;
   justify-content: space-between;
   margin-bottom: 1rem;
 }
@@ -421,7 +425,7 @@ body {
   padding: 0.375rem 0.75rem;
   border: none;
   border-radius: 0.5rem;
-  background: #18181b;
+  background: #2b2b30;
   color: white;
   cursor: pointer;
   font-size: 0.875rem;
@@ -452,8 +456,8 @@ body {
   border-radius: 0.75rem;
   border: 2px solid transparent;
   background: #f4f4f5;
-  color: #000000; /* opt out of dark-mode inheritance, same as .editor-shell */
-  min-height: 100px;
+  color: #000000;
+  min-height: 160px;
 }
 
 .tile-card-preview {
@@ -464,6 +468,18 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.tile-card-title {
+  margin: 0 0 0.625rem;
+  padding: 0.4rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  background: #3f3f46;
+  border-radius: 0.5rem;
+  display: block;
+  letter-spacing: 0.01em;
 }
 
 .tile-card-actions {
@@ -480,9 +496,22 @@ body {
   padding: 0.25rem 0.5rem;
   border: none;
   border-radius: 0.375rem;
-  background: white;
   cursor: pointer;
   font-size: 0.75rem;
+}
+
+.tile-card-edit {
+  background: white;
+  color: #000000;
+}
+
+.tile-card-apply {
+  background: #2b2b30;
+  color: white;
+}
+
+.tile-card-apply:hover {
+  background: #3f3f46;
 }
 
 .tile-card-delete {
@@ -513,6 +542,14 @@ body {
   margin: 0 0 1rem;
   font-size: 0.8125rem;
   color: #dc2626;
+}
+
+.personalize-header h2 {
+  margin: 0;
+  color: #18181b;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 /* Delete confirmation modal styles */
@@ -580,7 +617,7 @@ body {
 }
 
 .tile-editor-panel {
-  width: 320px;
+  width: 500px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -653,8 +690,21 @@ body {
 }
 
 .tile-editor-save {
-  background: #18181b;
+  background: #2b2b30;
   color: white;
+}
+
+.tile-editor-prompt-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tile-editor-prompt-field textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none; /* manual resize handle no longer makes sense once it auto-fills space */
 }
 
 /* editor shell */
@@ -672,7 +722,7 @@ body {
 }
 
 .chat-panel {
-  width: 320px;
+  width: 420px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -682,7 +732,7 @@ body {
 }
 
 .chat-panel-header {
-  padding: 0.75rem;
+  padding: 0.87rem;
   border-bottom: 1px solid #e4e4e7;
   font-weight: 600;
   font-size: 0.875rem;
@@ -744,7 +794,7 @@ body {
   padding: 0.375rem 0.75rem;
   border: none;
   border-radius: 0.375rem;
-  background: #18181b;
+  background: #2b2b30;
   color: white;
   cursor: pointer;
   font-size: 0.8125rem;

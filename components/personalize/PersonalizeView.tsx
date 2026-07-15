@@ -38,7 +38,7 @@ export default function PersonalizeView() {
   <div className="personalize-layout">
     <div className="personalize-view">
       <div className="personalize-header">
-        <h2>Personalize</h2>
+        <h2>Personalize your writing style</h2>
         <button type="button" onClick={handleAddTile}>
           + New style
         </button>

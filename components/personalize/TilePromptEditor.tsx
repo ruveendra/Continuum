@@ -49,13 +49,12 @@ export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
         />
       </label>
 
-      <label className="tile-editor-label">
+      <label className="tile-editor-label tile-editor-prompt-field">
         Prompt
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe how the AI should write — tone, structure, dos and don'ts…"
-          rows={10}
         />
       </label>
 
