@@ -1,18 +1,19 @@
 "use client";
 
+import { useState } from "react";
+import type { Editor } from "@tiptap/react";
 import RichTextEditor from "./RichTextEditor";
 import ChatPanel from "./ChatPanel";
 
-// This is the new wrapper for the Editor tab — puts the existing editor
-// and the new chat panel side by side. RichTextEditor itself is completely
-// untouched; this just adds a sibling next to it.
 export default function EditorShell() {
+  const [editor, setEditor] = useState<Editor | null>(null);
+
   return (
     <div className="editor-shell-layout">
       <div className="editor-shell-main">
-        <RichTextEditor />
+        <RichTextEditor onEditorReady={setEditor} />
       </div>
-      <ChatPanel />
+      {editor && <ChatPanel editor={editor} />}
     </div>
   );
 }

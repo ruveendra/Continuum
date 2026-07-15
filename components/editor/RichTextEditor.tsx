@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
@@ -17,7 +17,9 @@ import { useAISessionStore } from '@/lib/ai/aiSessionStore'
 import SelectionTooltip from './SelectionTooltip'
 import PinnedSessionTooltip from './PinnedSessionTooltip'
 
-function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
+
+
+function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (editor: Editor) => void }) {
   const setSelection = useEditorStore((state) => state.setSelection)
 
   // Subscribing to `sessions` here means THIS component re-renders whenever
@@ -47,6 +49,10 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
       setSelection(getEditorSelection(editor))
     },
   })
+
+  useEffect(() => {
+    if (editor) onEditorReady?.(editor);
+  }, [editor, onEditorReady]);
 
   // This is the bridge between Zustand (outside ProseMirror) and the
   // highlight plugin (inside ProseMirror) — see the long comment in
@@ -83,7 +89,12 @@ function TiptapEditor({ ydoc }: { ydoc: Y.Doc }) {
   )
 }
 
-export function RichTextEditor() {
+type Props = {
+  onEditorReady?: (editor: Editor) => void;
+};
+
+export function RichTextEditor({ onEditorReady }: Props) {
+  
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
 
   useEffect(() => {
@@ -112,7 +123,7 @@ export function RichTextEditor() {
 
   if (!ydoc) return <div>Loading...</div>;
 
-  return <TiptapEditor ydoc={ydoc} />
+  return <TiptapEditor ydoc={ydoc} onEditorReady={onEditorReady} />
 }
 
 export default RichTextEditor
