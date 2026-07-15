@@ -4,20 +4,25 @@ import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useChatStore } from "@/lib/chat/chatStore";
 import { usePersonalizeStore } from "@/lib/personalize/personalizeStore";
-import { requestDocumentGeneration } from "@/lib/ai/client";
-import { insertTextAtCursor } from "@/lib/editor/document";
+import { useEditorStore } from "@/lib/editor/editorStore";
+import { requestDocumentGeneration, requestAIEdit, requestSelectionIntent } from "@/lib/ai/client";
+import { insertTextAtCursor, rejectChatGeneration, replaceChatGeneration } from "@/lib/editor/document";
+import { getLiveChatGenerationRange } from "@/lib/editor/sessionPositions";
 
 type Props = { editor: Editor };
 
 export default function ChatPanel({ editor }: Props) {
   const messages = useChatStore((s) => s.messages);
   const addMessage = useChatStore((s) => s.addMessage);
+  const updateMessage = useChatStore((s) => s.updateMessage);
+  const pendingGeneration = useChatStore((s) => s.pendingGeneration);
+  const setPendingGeneration = useChatStore((s) => s.setPendingGeneration);
 
-  // Look up the CURRENTLY active tile's prompt text — this is what makes
-  // the chat's output reflect whatever style is selected in Personalize.
   const tiles = usePersonalizeStore((s) => s.tiles);
   const activeTileId = usePersonalizeStore((s) => s.activeTileId);
   const activeTile = tiles.find((t) => t.id === activeTileId) ?? null;
+
+  const selection = useEditorStore((s) => s.selection);
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,27 +40,91 @@ export default function ChatPanel({ editor }: Props) {
     setInput("");
     setIsLoading(true);
 
-    // Read the CURRENT document content fresh, right at send time — this
-    // is what lets the AI see whatever's already been written, including
-    // anything inserted by earlier chat messages in this same conversation.
-    const documentText = editor.getText();
-
     try {
-      const resultText = await requestDocumentGeneration(
-        documentText,
-        activeTile?.prompt ?? null,
-        messages, // history BEFORE this new message, matching the prompt builder's expectation
-        userMessage.content
-      );
+      if (pendingGeneration) {
+        const range = getLiveChatGenerationRange(editor, pendingGeneration.messageId) ?? pendingGeneration;
+        const currentText = editor.state.doc.textBetween(range.from, range.to, " ");
 
-      insertTextAtCursor(editor, resultText);
+        const resultText = await requestAIEdit(currentText, userMessage.content);
 
-      addMessage({
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: resultText,
-        createdAt: Date.now(),
-      });
+        replaceChatGeneration(editor, range.from, range.to, resultText);
+        updateMessage(pendingGeneration.messageId, { generationStatus: "rejected" });
+
+        const newMessageId = crypto.randomUUID();
+        addMessage({
+          id: newMessageId,
+          role: "assistant",
+          content: resultText,
+          createdAt: Date.now(),
+          generationStatus: "pending",
+        });
+
+        setPendingGeneration({
+          messageId: newMessageId,
+          from: range.from,
+          to: range.from + resultText.length,
+          originalText: pendingGeneration.originalText,
+          isReplacingOriginal: pendingGeneration.isReplacingOriginal,
+        });
+        return;
+      }
+
+      const targetsSelection = !selection.isEmpty
+        ? await requestSelectionIntent(selection.text, userMessage.content)
+        : false;
+
+      if (targetsSelection) {
+        const originalText = selection.text;
+        const resultText = await requestAIEdit(originalText, userMessage.content);
+
+        replaceChatGeneration(editor, selection.from, selection.to, resultText);
+
+        const newMessageId = crypto.randomUUID();
+        addMessage({
+          id: newMessageId,
+          role: "assistant",
+          content: resultText,
+          createdAt: Date.now(),
+          generationStatus: "pending",
+        });
+
+        setPendingGeneration({
+          messageId: newMessageId,
+          from: selection.from,
+          to: selection.from + resultText.length,
+          originalText,
+          isReplacingOriginal: true,
+        });
+      } else {
+        const documentText = editor.getText();
+        const { from } = editor.state.selection;
+
+        const resultText = await requestDocumentGeneration(
+          documentText,
+          activeTile?.prompt ?? null,
+          messages,
+          userMessage.content
+        );
+
+        insertTextAtCursor(editor, resultText);
+
+        const newMessageId = crypto.randomUUID();
+        addMessage({
+          id: newMessageId,
+          role: "assistant",
+          content: resultText,
+          createdAt: Date.now(),
+          generationStatus: "pending",
+        });
+
+        setPendingGeneration({
+          messageId: newMessageId,
+          from,
+          to: from + resultText.length,
+          originalText: "",
+          isReplacingOriginal: false,
+        });
+      }
     } catch {
       addMessage({
         id: crypto.randomUUID(),
@@ -68,6 +137,20 @@ export default function ChatPanel({ editor }: Props) {
     }
   };
 
+  const handleAccept = (messageId: string) => {
+    updateMessage(messageId, { generationStatus: "accepted" });
+    setPendingGeneration(null);
+  };
+
+  const handleReject = (messageId: string) => {
+    if (pendingGeneration) {
+      const range = getLiveChatGenerationRange(editor, messageId) ?? pendingGeneration;
+      rejectChatGeneration(editor, range.from, range.to, pendingGeneration.originalText);
+    }
+    updateMessage(messageId, { generationStatus: "rejected" });
+    setPendingGeneration(null);
+  };
+
   return (
     <div className="chat-panel">
       <div className="chat-panel-header">
@@ -78,7 +161,17 @@ export default function ChatPanel({ editor }: Props) {
       <div className="chat-panel-messages">
         {messages.map((m) => (
           <div key={m.id} className={`chat-message chat-message-${m.role}`}>
-            {m.content}
+            <div>{m.content}</div>
+            {m.generationStatus === "pending" && (
+              <div className="chat-message-actions">
+                <button type="button" className="chat-accept" onClick={() => handleAccept(m.id)} aria-label="Accept">
+                  ✓
+                </button>
+                <button type="button" className="chat-reject" onClick={() => handleReject(m.id)} aria-label="Reject">
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {isLoading && <div className="chat-message chat-message-assistant">Thinking…</div>}
@@ -89,7 +182,13 @@ export default function ChatPanel({ editor }: Props) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask AI to write something…"
+          placeholder={
+            pendingGeneration
+              ? "Ask for a change…"
+              : !selection.isEmpty
+                ? "Ask AI to edit the selected text…"
+                : "Ask AI to write something…"
+          }
           disabled={isLoading}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSend();

@@ -2,6 +2,7 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useAISessionStore } from "@/lib/ai/aiSessionStore";
+import { useChatStore } from "@/lib/chat/chatStore";
 
 export const sessionHighlightPluginKey = new PluginKey("sessionHighlight");
 
@@ -15,18 +16,11 @@ export const SessionHighlight = Extension.create({
         state: {
           init: () => DecorationSet.empty,
 
-          // Runs on EVERY transaction now — both real edits/selection
-          // changes, and the "please re-check the store" pings we dispatch
-          // manually from RichTextEditor. No more special-casing based on
-          // WHY this ran; it just always rebuilds correctly from the two
-          // sources of truth: the session store, and the live selection.
           apply(tr, old) {
             const mapped = old.map(tr.mapping, tr.doc);
             const { sessions } = useAISessionStore.getState();
+            const { pendingGeneration } = useChatStore.getState();
 
-            // Sessions: reuse each one's current (already-remapped)
-            // position if it has one; only fall back to its originally
-            // stored position if it's brand new this transaction.
             const sessionDecorations = sessions.map((session) => {
               const existing = mapped.find(undefined, undefined, (spec: any) => spec?.sessionId === session.id);
               const from = existing.length > 0 ? existing[0].from : session.from;
@@ -39,16 +33,55 @@ export const SessionHighlight = Extension.create({
               );
             });
 
-            // Pending: read straight off tr.selection, no stored copy.
-            // ProseMirror guarantees this is already correctly positioned
-            // for the CURRENT document, no matter what just changed.
+            // Same reuse-existing-position logic as sessions — the chat's
+            // pending generation also needs to survive edits elsewhere in
+            // the document without drifting to the wrong spot.
+            const chatDecorations = (() => {
+              if (!pendingGeneration) return [];
+              const existing = mapped.find(undefined, undefined, (spec: any) => spec?.chatGenerationId === pendingGeneration.messageId);
+              const from = existing.length > 0 ? existing[0].from : pendingGeneration.from;
+              const to = existing.length > 0 ? existing[0].to : pendingGeneration.to;
+
+              const decorations = [
+                Decoration.inline(
+                  from,
+                  to,
+                  { class: "chat-generation-highlight" },
+                  { chatGenerationId: pendingGeneration.messageId }
+                ),
+              ];
+
+              // Only show the "before" text when we're actually replacing something
+              // that existed before any AI touched it — never for fresh insertions.
+              if (pendingGeneration.isReplacingOriginal && pendingGeneration.originalText) {
+                decorations.push(
+                  Decoration.widget(
+                    from,
+                    () => {
+                      const span = document.createElement("span");
+                      span.className = "chat-generation-strikethrough";
+                      span.textContent = pendingGeneration.originalText;
+                      return span;
+                    },
+                    { side: -1 }
+                  )
+                );
+              }
+
+              return decorations;
+            })();
+
             const { from: selFrom, to: selTo } = tr.selection;
-            const pendingDecorations =
+            const pendingSelectionDecorations =
               selFrom !== selTo
                 ? [Decoration.inline(selFrom, selTo, { class: "ai-pending-highlight" }, { pending: true })]
                 : [];
 
-            return DecorationSet.create(tr.doc, [...sessionDecorations, ...pendingDecorations]);
+            return DecorationSet.create(tr.doc, [
+              ...sessionDecorations,
+              ...chatDecorations,
+              ...pendingSelectionDecorations,
+            ]);
           },
         },
         props: {

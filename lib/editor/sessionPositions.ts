@@ -33,3 +33,12 @@ export function getLiveSessionRange(
 
   return { from: found[0].from, to: found[0].to };
 }
+
+// Same idea, keyed by the chat message id instead of a session id.
+export function getLiveChatGenerationRange(editor: Editor, messageId: string) {
+  const decorationSet = sessionHighlightPluginKey.getState(editor.state) as DecorationSet | undefined;
+  if (!decorationSet) return null;
+  const found = decorationSet.find(undefined, undefined, (spec: any) => spec.chatGenerationId === messageId);
+  if (found.length === 0) return null;
+  return { from: found[0].from, to: found[0].to };
+}

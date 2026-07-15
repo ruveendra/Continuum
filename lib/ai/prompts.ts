@@ -55,3 +55,19 @@ Write the content the user is asking for, taking the existing document and
 any earlier instructions into account. Return ONLY the new text to insert —
 no explanations, no preamble, no markdown formatting.`;
 }
+
+// Asks the AI a yes/no question: does this instruction actually want to
+// change the currently selected text, or is it unrelated? Kept as a
+// SEPARATE, cheap call rather than folding into the main generation
+// prompt, so the classification logic stays simple to reason about and
+// easy to test independently of the actual rewrite.
+export function buildSelectionIntentPrompt(selectedText: string, instruction: string): string {
+  return `A user has this text selected in their document:
+"""
+${selectedText}
+"""
+
+They then typed this instruction in a chat: "${instruction}"
+
+Does the instruction intend to modify, rewrite, or change the MEANING of the selected text specifically? Answer with exactly one word: "yes" or "no". If the instruction is about writing something new or unrelated to the selected text, answer "no".`;
+}
