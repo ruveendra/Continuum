@@ -9,24 +9,23 @@ type Props = {
   onClose: () => void;
 };
 
-// The right-side panel for editing one tile's title + prompt text.
-// Uses LOCAL state for the input fields (title/prompt) rather than writing
-// to the store on every keystroke — this means typing feels instant and
-// nothing is saved until the user explicitly clicks Save, so accidental
-// edits can be discarded by just closing the panel.
+const PROMPT_MAX_LENGTH = 600;
+
 export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
   const [title, setTitle] = useState(tile.title);
   const [prompt, setPrompt] = useState(tile.prompt);
 
-  // If the user clicks Edit on a DIFFERENT tile while this panel is
-  // already open, `tile` prop changes — this resets the local fields to
-  // match the newly selected tile instead of showing stale text.
   useEffect(() => {
     setTitle(tile.title);
     setPrompt(tile.prompt);
   }, [tile]);
 
+  // Lets the Save button reflect real state — disabled when nothing's
+  // actually changed, and the header can show an "unsaved" dot when it has.
+  const hasChanges = title !== tile.title || prompt !== tile.prompt;
+
   const handleSave = () => {
+    if (!hasChanges) return;
     onSave({ title, prompt });
     onClose();
   };
@@ -34,11 +33,20 @@ export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
   return (
     <div className="tile-editor-panel">
       <div className="tile-editor-header">
-        <h3>Edit style</h3>
+        <div className="tile-editor-heading">
+          <h3>Edit style</h3>
+          {hasChanges && <span className="tile-editor-unsaved-dot" aria-label="Unsaved changes" />}
+        </div>
         <button type="button" onClick={onClose} aria-label="Close">
           ×
         </button>
       </div>
+
+      {tile.isDefault && (
+        <div className="tile-editor-default-note">
+          This is a built-in style. You can edit it, but it can&apos;t be deleted.
+        </div>
+      )}
 
       <label className="tile-editor-label">
         Title
@@ -46,15 +54,26 @@ export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Formal, Punchy, Academic…"
         />
       </label>
 
       <label className="tile-editor-label tile-editor-prompt-field">
-        Prompt
+        <div className="tile-editor-prompt-label-row">
+          <span>Prompt</span>
+          <span
+            className={`tile-editor-char-count ${
+              prompt.length > PROMPT_MAX_LENGTH ? "tile-editor-char-count-over" : ""
+            }`}
+          >
+            {prompt.length}/{PROMPT_MAX_LENGTH}
+          </span>
+        </div>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe how the AI should write — tone, structure, dos and don'ts…"
+          maxLength={PROMPT_MAX_LENGTH}
         />
       </label>
 
@@ -62,8 +81,13 @@ export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
         <button type="button" className="tile-editor-cancel" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="tile-editor-save" onClick={handleSave}>
-          Save
+        <button
+          type="button"
+          className="tile-editor-save"
+          onClick={handleSave}
+          disabled={!hasChanges}
+        >
+          {hasChanges ? "Save changes" : "Saved"}
         </button>
       </div>
     </div>

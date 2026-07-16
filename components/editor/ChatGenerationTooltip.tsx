@@ -14,71 +14,78 @@ type Props = { editor: Editor };
 // already shown in the chat bubble, so the user doesn't have to look
 // away from what they're editing to approve/reject it.
 export default function ChatGenerationTooltip({ editor }: Props) {
-  const pendingGeneration = useChatStore((s) => s.pendingGeneration);
-  const updateMessage = useChatStore((s) => s.updateMessage);
-  const setPendingGeneration = useChatStore((s) => s.setPendingGeneration);
+    const pendingGeneration = useChatStore((s) => s.pendingGeneration);
+    const updateMessage = useChatStore((s) => s.updateMessage);
+    const setPendingGeneration = useChatStore((s) => s.setPendingGeneration);
 
-  const [rect, setRect] = useState<DOMRect | null>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
 
-  const { refs, floatingStyles } = useFloating({
-    open: rect !== null,
-    placement: "top",
-    middleware: [offset(4), flip(), shift({ padding: 8 })],
-    whileElementsMounted: autoUpdate,
-  });
+    const { refs, floatingStyles } = useFloating({
+        open: rect !== null,
+        placement: "top",
+        middleware: [offset(4), flip(), shift({ padding: 8 })],
+        whileElementsMounted: autoUpdate,
+    });
 
-  useEffect(() => {
-    if (!pendingGeneration) {
-      setRect(null);
-      return;
-    }
+    useEffect(() => {
+        if (!pendingGeneration) {
+            setRect(null);
+            return;
+        }
 
-      const updatePosition = () => {
-          const range = getLiveChatGenerationRange(editor, pendingGeneration.messageId) ?? pendingGeneration;
+        const updatePosition = () => {
+            const range = getLiveChatGenerationRange(editor, pendingGeneration.messageId) ?? pendingGeneration;
 
-          // Anchor to the END position only (range.to), not a bounding box over
-          // the whole highlighted span — this is what places the buttons right
-          // after the last character instead of floating above the middle.
-          const end = editor.view.coordsAtPos(range.to);
+            // Guard: if the document hasn't finished syncing yet (e.g. right after
+            // switching tabs and remounting the editor), the stored position might
+            // briefly exceed the current document's size. Skip this update rather
+            // than crash — a later "transaction" event (once sync catches up) will
+            // retry with a valid position.
+            const docSize = editor.state.doc.content.size;
+            if (range.from > docSize || range.to > docSize) {
+                setRect(null);
+                return;
+            }
 
-          const newRect = new DOMRect(end.left, end.top, 0, end.bottom - end.top);
+            const start = editor.view.coordsAtPos(range.from);
+            const end = editor.view.coordsAtPos(range.to);
 
-          setRect(newRect);
-          refs.setReference({ getBoundingClientRect: () => newRect });
-      };
+            const newRect = new DOMRect(end.left, end.top, 0, end.bottom - end.top);
 
-    updatePosition();
+            setRect(newRect);
+            refs.setReference({ getBoundingClientRect: () => newRect });
+        };
 
-    // Reposition on every edit, same as PinnedSessionTooltip — keeps this
-    // glued to the highlighted text even if content shifts above it.
-    editor.on("transaction", updatePosition);
-    return () => {
-      editor.off("transaction", updatePosition);
+        updatePosition();
+
+        editor.on("transaction", updatePosition);
+        return () => {
+            editor.off("transaction", updatePosition);
+        };
+    }, [editor, pendingGeneration, refs]);
+
+    if (!pendingGeneration || !rect) return null;
+
+    const handleAccept = () => {
+        updateMessage(pendingGeneration.messageId, { generationStatus: "accepted" });
+        setPendingGeneration(null);
     };
-  }, [editor, pendingGeneration, refs]);
 
-  if (!pendingGeneration || !rect) return null;
+    const handleReject = () => {
+        const range = getLiveChatGenerationRange(editor, pendingGeneration.messageId) ?? pendingGeneration;
+        rejectChatGeneration(editor, range.from, range.to, pendingGeneration.originalText);
+        updateMessage(pendingGeneration.messageId, { generationStatus: "rejected" });
+        setPendingGeneration(null);
+    };
 
-  const handleAccept = () => {
-    updateMessage(pendingGeneration.messageId, { generationStatus: "accepted" });
-    setPendingGeneration(null);
-  };
-
-  const handleReject = () => {
-    const range = getLiveChatGenerationRange(editor, pendingGeneration.messageId) ?? pendingGeneration;
-    rejectChatGeneration(editor, range.from, range.to, pendingGeneration.originalText);
-    updateMessage(pendingGeneration.messageId, { generationStatus: "rejected" });
-    setPendingGeneration(null);
-  };
-
-  return (
-    <div ref={refs.setFloating} style={floatingStyles} className="chat-inline-approval">
-      <button type="button" className="chat-inline-accept" onClick={handleAccept} aria-label="Accept">
-        ✓
-      </button>
-      <button type="button" className="chat-inline-reject" onClick={handleReject} aria-label="Reject">
-        ✕
-      </button>
-    </div>
-  );
+    return (
+        <div ref={refs.setFloating} style={floatingStyles} className="chat-inline-approval">
+            <button type="button" className="chat-inline-accept" onClick={handleAccept} aria-label="Accept">
+                ✓
+            </button>
+            <button type="button" className="chat-inline-reject" onClick={handleReject} aria-label="Reject">
+                ✕
+            </button>
+        </div>
+    );
 }
