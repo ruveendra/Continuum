@@ -10,74 +10,99 @@ import type { AISession } from "@/types/ai";
 
 type Props = { editor: Editor; session: AISession };
 
-// Unlike SelectionTooltip (one instance, follows the live cursor), THIS
-// component gets rendered ONCE PER ACTIVE SESSION (see the .map() in
-// RichTextEditor.tsx) — so if you have 3 pending AI suggestions, there are
-// 3 separate instances of this component on screen simultaneously, each
-// anchored to its own piece of text.
 export default function PinnedSessionTooltip({ editor, session }: Props) {
   const removeSession = useAISessionStore((s) => s.removeSession);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const { refs, floatingStyles } = useFloating({
     open: rect !== null,
-    placement: "bottom", // pinned tooltips sit BELOW their text (live tooltip is above) so they don't visually collide
+    placement: "bottom",
     middleware: [offset(8), flip(), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   });
 
   useEffect(() => {
-  const updatePosition = () => {
-    const range = getLiveSessionRange(editor, session.id) ?? session;
+    const updatePosition = () => {
+      const range = getLiveSessionRange(editor, session.id) ?? session;
 
-    const start = editor.view.coordsAtPos(range.from);
-    const end = editor.view.coordsAtPos(range.to);
+      const docSize = editor.state.doc.content.size;
+      if (range.from > docSize || range.to > docSize) {
+        setRect(null);
+        return;
+      }
 
-    const newRect = new DOMRect(
-      Math.min(start.left, end.left),
-      Math.min(start.top, end.top),
-      Math.abs(end.right - start.left),
-      Math.max(start.bottom, end.bottom) - Math.min(start.top, end.top)
-    );
+      const start = editor.view.coordsAtPos(range.from);
+      const end = editor.view.coordsAtPos(range.to);
 
-    setRect(newRect);
-    refs.setReference({ getBoundingClientRect: () => newRect });
-  };
+      const newRect = new DOMRect(
+        Math.min(start.left, end.left),
+        Math.min(start.top, end.top),
+        Math.abs(end.right - start.left),
+        Math.max(start.bottom, end.bottom) - Math.min(start.top, end.top)
+      );
 
-  updatePosition(); // run once immediately, same as before
+      setRect(newRect);
+      refs.setReference({ getBoundingClientRect: () => newRect });
+    };
 
-  // NEW: also re-run on every editor transaction, so the tooltip tracks
-  // the highlight's live-remapped position instead of freezing at its
-  // original spot.
-  editor.on("transaction", updatePosition);
-  return () => {
-    editor.off("transaction", updatePosition);
-  };
-}, [editor, session, refs]);
+    updatePosition();
+    editor.on("transaction", updatePosition);
+    return () => {
+      editor.off("transaction", updatePosition);
+    };
+  }, [editor, session, refs]);
 
-  const handleReject = () => removeSession(session.id); // just remove — document is untouched
+  const handleReject = () => removeSession(session.id);
   const handleAccept = () => {
-    applySessionAccept(editor, session); // actually replace the text in the document
-    removeSession(session.id);            // then remove the session — its job is done
+    applySessionAccept(editor, session);
+    removeSession(session.id);
   };
+
+  if (!rect) return null;
 
   return (
     <div ref={refs.setFloating} style={floatingStyles} className="session-tooltip">
-      {session.status === "loading" && <div className="session-loading">Thinking…</div>}
+      {session.status === "loading" && (
+        <div className="session-loading">
+          <span className="session-typing-dot" />
+          <span className="session-typing-dot" />
+          <span className="session-typing-dot" />
+        </div>
+      )}
 
       {session.status === "error" && (
         <div className="session-error">
-          {session.error ?? "Something went wrong"}
-          <button onClick={handleReject}>Dismiss</button>
+          <span>{session.error ?? "Something went wrong"}</span>
+          <button type="button" className="session-dismiss" onClick={handleReject}>
+            Dismiss
+          </button>
         </div>
       )}
 
       {session.status === "success" && (
-        <div className="session-result">
+        <div className="session-result-card">
           <p className="session-result-text">{session.resultText}</p>
           <div className="session-actions">
-            <button className="accept" onClick={handleAccept}>Accept</button>
-            <button className="reject" onClick={handleReject}>Reject</button>
+            <button
+              type="button"
+              className="session-accept"
+              onClick={handleAccept}
+              aria-label="Accept"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 13L9.5 17.5L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="session-reject"
+              onClick={handleReject}
+              aria-label="Reject"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
