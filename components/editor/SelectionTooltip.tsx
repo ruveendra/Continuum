@@ -112,16 +112,28 @@ export default function SelectionTooltip({ editor }: Props) {
         </div>
       ) : (
         <div className="selection-tooltip-form">
-          <input
-            type="text"
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="Ask AI to edit this…"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSubmit();
-            }}
-          />
-          <button type="button" onClick={handleSubmit}>Go</button>
+          <div className="selection-tooltip-input-wrap">
+            <input
+              type="text"
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder="Ask AI to edit this…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmit();
+              }}
+            />
+            <button type="button" onClick={handleSubmit} aria-label="Submit">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M4 12L20 4L14 20L11 13L4 12Z"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </div>

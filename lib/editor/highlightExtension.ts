@@ -18,29 +18,43 @@ export const SessionHighlight = Extension.create({
 
           apply(tr, old) {
             const mapped = old.map(tr.mapping, tr.doc);
+            const docSize = tr.doc.content.size;
+
+            // Guard against stale positions from before a remount/resync —
+            // skip building a decoration for anything currently out of range
+            // rather than let Decoration.inline/DecorationSet.create throw
+            // or silently fail. A later transaction (once sync catches up)
+            // will retry with valid positions.
+            const inBounds = (from: number, to: number) =>
+              from >= 0 && to <= docSize && from <= to;
+
             const { sessions } = useAISessionStore.getState();
             const { pendingGeneration } = useChatStore.getState();
 
-            const sessionDecorations = sessions.map((session) => {
+            const sessionDecorations = sessions.flatMap((session) => {
               const existing = mapped.find(undefined, undefined, (spec: any) => spec?.sessionId === session.id);
               const from = existing.length > 0 ? existing[0].from : session.from;
               const to = existing.length > 0 ? existing[0].to : session.to;
-              return Decoration.inline(
-                from,
-                to,
-                { class: `ai-session-highlight ai-session-${session.status}` },
-                { sessionId: session.id }
-              );
+
+              if (!inBounds(from, to)) return [];
+
+              return [
+                Decoration.inline(
+                  from,
+                  to,
+                  { class: `ai-session-highlight ai-session-${session.status}` },
+                  { sessionId: session.id }
+                ),
+              ];
             });
 
-            // Same reuse-existing-position logic as sessions — the chat's
-            // pending generation also needs to survive edits elsewhere in
-            // the document without drifting to the wrong spot.
             const chatDecorations = (() => {
               if (!pendingGeneration) return [];
               const existing = mapped.find(undefined, undefined, (spec: any) => spec?.chatGenerationId === pendingGeneration.messageId);
               const from = existing.length > 0 ? existing[0].from : pendingGeneration.from;
               const to = existing.length > 0 ? existing[0].to : pendingGeneration.to;
+
+              if (!inBounds(from, to)) return [];
 
               const decorations = [
                 Decoration.inline(
@@ -51,8 +65,6 @@ export const SessionHighlight = Extension.create({
                 ),
               ];
 
-              // Only show the "before" text when we're actually replacing something
-              // that existed before any AI touched it — never for fresh insertions.
               if (pendingGeneration.isReplacingOriginal && pendingGeneration.originalText) {
                 decorations.push(
                   Decoration.widget(

@@ -194,8 +194,22 @@ export default function ChatPanel({ editor }: Props) {
             if (e.key === "Enter") handleSend();
           }}
         />
-        <button type="button" onClick={handleSend} disabled={isLoading}>
-          Send
+        <button
+          type="button"
+          className="chat-send-button"
+          onClick={handleSend}
+          disabled={isLoading || !input.trim()}
+          aria-label="Send"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M4 12L20 4L14 20L11 13L4 12Z"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
     </div>

@@ -62,18 +62,25 @@ function TiptapEditor({ ydoc, onEditorReady }: { ydoc: Y.Doc; onEditorReady?: (e
   // special flag (setMeta), which the plugin's `apply` function checks for
   // to know "please rebuild your decorations from the current session list."
   useEffect(() => {
-  if (!editor) return
-  const unsubscribeSessions = useAISessionStore.subscribe(() => {
+    if (!editor) return
+
+    // Force an initial decoration sync — the plugin starts empty on every
+    // fresh mount (e.g. after switching tabs and back), so anything already
+    // sitting in the stores (a pending session or chat generation) needs to
+    // be drawn immediately, not just wait for the NEXT store change.
     editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
-  })
-  const unsubscribeChat = useChatStore.subscribe(() => {
-    editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
-  })
-  return () => {
-    unsubscribeSessions()
-    unsubscribeChat()
-  }
-}, [editor])
+
+    const unsubscribeSessions = useAISessionStore.subscribe(() => {
+      editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+    })
+    const unsubscribeChat = useChatStore.subscribe(() => {
+      editor.view.dispatch(editor.state.tr.setMeta(sessionHighlightPluginKey, true))
+    })
+    return () => {
+      unsubscribeSessions()
+      unsubscribeChat()
+    }
+  }, [editor])
 
   if (!editor) return null;
 
@@ -100,7 +107,7 @@ type Props = {
 };
 
 export function RichTextEditor({ onEditorReady }: Props) {
-  
+
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
 
   useEffect(() => {
