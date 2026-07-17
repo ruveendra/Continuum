@@ -61,7 +61,9 @@ body {
 
 /*
   Editor shell
-  This is the visible frame around the Tiptap editor area.
+  This is the visible frame around the Tiptap editor area. It sits as a
+  raised card on top of editor-shell-main's canvas background, so it needs
+  its own border, radius, and shadow to read as "elevated."
 */
 .editor-shell {
   display: flex;
@@ -69,10 +71,10 @@ body {
   min-height: 0;
   width: 100%;
   flex-direction: column;
-  border-radius: 0;
+  border-radius: 0.875rem;
   border: 1px solid #e4e4e7;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
   color: #000000;
 }
 
@@ -198,6 +200,10 @@ body {
 
   border-bottom: 1px solid #e4e4e7;
   background: #fff;
+  /* Match editor-shell's rounded corners so the toolbar doesn't square off
+     the top of the card it's flush against. */
+  border-top-left-radius: 0.875rem;
+  border-top-right-radius: 0.875rem;
 
   flex-shrink: 0;
 }
@@ -565,10 +571,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   margin: 0 0 1.5rem;
-  padding: 1rem 1.25rem;
+  padding: 1.125rem 1.375rem;
   border-radius: 0.875rem;
-  background: #3f3f46;
+  background: linear-gradient(135deg, #3f3f46, #2b2b30);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
 }
 
@@ -580,8 +587,12 @@ body {
   letter-spacing: 0.01em;
 }
 
-.personalize-header button {
-  padding: 0.5rem 1rem;
+.personalize-add-button {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.5rem 1.125rem 0.5rem 0.875rem;
   border: none;
   border-radius: 999px;
   background: white;
@@ -592,7 +603,7 @@ body {
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
-.personalize-header button:hover {
+.personalize-add-button:hover {
   background: rgb(255 255 255 / 0.85);
   transform: scale(1.03);
 }
@@ -733,6 +744,95 @@ body {
 .tile-card-delete:hover {
   background: #fee2e2;
   color: #dc2626;
+}
+
+/* Dismissible "what is this" bubble, bottom-right of the Personalize view */
+
+.personalize-info-bubble {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  max-width: 300px;
+  padding: 1rem 1.125rem;
+  border-radius: 1rem;
+  background: #2b2b30;
+  color: white;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+  z-index: 60;
+  animation: personalize-info-in 0.2s ease-out;
+  transition: right 0.18s ease-out;
+}
+
+/* Shifts left by the tile editor panel's width so the bubble stays anchored
+   to the tile grid instead of getting covered by the panel. */
+.personalize-info-bubble-shifted {
+  right: calc(500px + 1.5rem);
+}
+
+@keyframes personalize-info-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.personalize-info-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: rgb(74 222 128 / 0.15);
+  color: #4ade80;
+}
+
+.personalize-info-body {
+  min-width: 0;
+}
+
+.personalize-info-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.personalize-info-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.personalize-info-text {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.personalize-info-close {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255 / 0.7);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.personalize-info-close:hover {
+  background: rgb(255 255 255 / 0.18);
+  color: white;
 }
 
 /* Delete confirmation modal styles */
@@ -1001,12 +1101,17 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
+  /* Shared canvas behind both the editor card and the chat panel card —
+     same pattern as .personalize-view's background behind its white tile
+     cards. */
+  background: #fafafa;
 }
 
 .editor-shell-main {
   flex: 1;
   min-height: 0;
   display: flex;
+  padding: 1.25rem;
 }
 
 .chat-panel {
@@ -1014,23 +1119,65 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #e4e4e7;
+  /* Floats as its own card on .editor-shell-layout's canvas, same treatment
+     as .editor-shell. editor-shell-main's right padding already supplies
+     the gap on the left side, so this only needs it on the other three. */
+  margin: 1.25rem 1.25rem 1.25rem 0;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.875rem;
   background: #fafafa;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
   color: #000000;
+  /* No floating tooltips live inside this subtree (they're mounted inside
+     .editor-shell instead), so it's safe to clip here to round off the
+     header/input corners without matching radii on each one individually. */
+  overflow: hidden;
 }
 
 .chat-panel-header {
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid #e4e4e7;
-  background: #3f3f46;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #303035;
+  background: linear-gradient(135deg, #3f3f46, #2b2b30);
   color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
-.chat-panel-active-style {
-  font-weight: normal;
-  color: rgb(255 255 255 / 0.6);
+/* Small accent chip echoing the green cursor dot in the app logo — ties the
+   chat panel's "AI" identity back to the wordmark. */
+.chat-panel-header-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: rgb(74 222 128 / 0.15);
+  color: #4ade80;
+}
+
+.chat-panel-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.chat-panel-header-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+}
+
+.chat-panel-header-subtitle {
+  font-size: 0.6875rem;
+  color: rgb(255 255 255 / 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-panel-messages {

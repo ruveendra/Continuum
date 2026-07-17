@@ -8,6 +8,7 @@ import { useEditorStore } from "@/lib/editor/editorStore";
 import { requestDocumentGeneration, requestAIEdit, requestSelectionIntent } from "@/lib/ai/client";
 import { insertTextAtCursor, rejectChatGeneration, replaceChatGeneration } from "@/lib/editor/document";
 import { getLiveChatGenerationRange } from "@/lib/editor/sessionPositions";
+import { SparkleIcon } from "./ToolbarIcons";
 
 type Props = { editor: Editor };
 
@@ -154,8 +155,15 @@ export default function ChatPanel({ editor }: Props) {
   return (
     <div className="chat-panel">
       <div className="chat-panel-header">
-        Chat
-        {activeTile && <span className="chat-panel-active-style"> · {activeTile.title}</span>}
+        <div className="chat-panel-header-icon">
+          <SparkleIcon />
+        </div>
+        <div className="chat-panel-header-text">
+          <span className="chat-panel-header-title">AI Chat</span>
+          <span className="chat-panel-header-subtitle">
+            {activeTile ? activeTile.title : "General writing style"}
+          </span>
+        </div>
       </div>
 
       <div className="chat-panel-messages">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePersonalizeStore, MAX_TILES } from "@/lib/personalize/personalizeStore";
 import TileCard from "./TileCard";
 import TilePromptEditor from "./TilePromptEditor";
+import { InfoIcon, PlusIcon } from "@/components/editor/ToolbarIcons";
 
 export default function PersonalizeView() {
   const tiles = usePersonalizeStore((s) => s.tiles);
@@ -14,6 +15,7 @@ export default function PersonalizeView() {
 
   const [capWarning, setCapWarning] = useState(false);
   const [editingTileId, setEditingTileId] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(true);
   const editingTile = tiles.find((t) => t.id === editingTileId) ?? null;
   const updateTile = usePersonalizeStore((s) => s.updateTile);
 
@@ -38,9 +40,10 @@ export default function PersonalizeView() {
   <div className="personalize-layout">
     <div className="personalize-view">
       <div className="personalize-header">
-        <h2>Personalize your writing style</h2>
-        <button type="button" onClick={handleAddTile}>
-          + New style
+        <h2>Personalize Your Writing Style</h2>
+        <button type="button" className="personalize-add-button" onClick={handleAddTile}>
+          <PlusIcon />
+          New style
         </button>
       </div>
 
@@ -74,6 +77,32 @@ export default function PersonalizeView() {
         onSave={(patch) => updateTile(editingTile.id, patch)}
         onClose={() => setEditingTileId(null)}
       />
+    )}
+
+    {showInfo && (
+      <div className={`personalize-info-bubble${editingTile ? " personalize-info-bubble-shifted" : ""}`}>
+        <div className="personalize-info-icon">
+          <InfoIcon />
+        </div>
+        <div className="personalize-info-body">
+          <div className="personalize-info-header">
+            <p className="personalize-info-title">What&apos;s this?</p>
+            <button
+              type="button"
+              className="personalize-info-close"
+              onClick={() => setShowInfo(false)}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+          <p className="personalize-info-text">
+            This is where you shape the AI&apos;s voice. Each tile is a writing
+            style you define, and whichever one is active guides how the AI
+            writes and edits for you.
+          </p>
+        </div>
+      </div>
     )}
   </div>
 );
