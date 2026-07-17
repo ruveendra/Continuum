@@ -52,7 +52,7 @@ export default function TilePromptEditor({ tile, onSave, onClose }: Props) {
       <div className="tile-editor-body">
         {tile.isDefault && (
           <div className="tile-editor-default-note">
-            This is a built-in style, feel free to edit it, just know it can&apos;t be deleted
+            This is a built-in style, you can edit it but it can&apos;t be deleted
           </div>
         )}
 
