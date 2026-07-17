@@ -1394,8 +1394,9 @@ body {
 
 .chat-panel-input input:focus {
   outline: none;
-  border-color: #3f3f46;
+  border-color: #4ade80;
   background: white;
+  box-shadow: 0 0 0 3px rgb(74 222 128 / 0.18);
 }
 
 .chat-panel-input input:disabled {

@@ -15,9 +15,18 @@ export default function PersonalizeView() {
 
   const [capWarning, setCapWarning] = useState(false);
   const [editingTileId, setEditingTileId] = useState<string | null>(null);
-  const [showInfo, setShowInfo] = useState(true);
+  // Once dismissed, stays dismissed across tab switches and reloads — this
+  // is per-browser only, same as the rest of the app's local-only state.
+  const [showInfo, setShowInfo] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("continuum-personalize-info-dismissed") !== "true"
+  );
   const editingTile = tiles.find((t) => t.id === editingTileId) ?? null;
   const updateTile = usePersonalizeStore((s) => s.updateTile);
+
+  const dismissInfo = () => {
+    setShowInfo(false);
+    localStorage.setItem("continuum-personalize-info-dismissed", "true");
+  };
 
   const handleAddTile = () => {
     const created = addTile({
@@ -90,7 +99,7 @@ export default function PersonalizeView() {
             <button
               type="button"
               className="personalize-info-close"
-              onClick={() => setShowInfo(false)}
+              onClick={dismissInfo}
               aria-label="Dismiss"
             >
               ×
