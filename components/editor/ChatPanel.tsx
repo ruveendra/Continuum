@@ -182,7 +182,15 @@ export default function ChatPanel({ editor }: Props) {
             )}
           </div>
         ))}
-        {isLoading && <div className="chat-message chat-message-assistant">Thinking…</div>}
+        {isLoading && (
+          <div className="chat-message chat-message-assistant">
+            <div className="chat-typing">
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+              <span className="chat-typing-dot" />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="chat-panel-input">

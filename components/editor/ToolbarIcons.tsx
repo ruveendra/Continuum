@@ -21,6 +21,21 @@ export function UndoIcon() {
   );
 }
 
+export function EditIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M11.4 2.6a1.5 1.5 0 0 1 2.1 2.1L5.8 12.4l-2.9.8.8-2.9 7.7-7.7Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">

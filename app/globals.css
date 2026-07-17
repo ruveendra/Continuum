@@ -676,15 +676,21 @@ body {
 }
 
 .tile-card-actions {
-  display: none;
+  display: flex;
   gap: 0.5rem;
   margin-top: 0.875rem;
   padding-top: 0.875rem;
   border-top: 1px solid #f0f0f0;
+  /* Reserve the space at all times so hovering doesn't grow the tile and
+     shift the rest of the grid — only visibility/opacity toggle. */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 .tile-card:hover .tile-card-actions {
-  display: flex;
+  visibility: visible;
+  opacity: 1;
 }
 
 .tile-card-actions button {
@@ -768,7 +774,7 @@ body {
 /* Shifts left by the tile editor panel's width so the bubble stays anchored
    to the tile grid instead of getting covered by the panel. */
 .personalize-info-bubble-shifted {
-  right: calc(500px + 1.5rem);
+  right: calc(500px + 2rem);
 }
 
 @keyframes personalize-info-in {
@@ -908,12 +914,17 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.125rem;
-  padding: 1.5rem;
-  border-left: 1px solid #e4e4e7;
+  /* Floats as its own card on the Personalize canvas, same treatment as
+     .editor-shell and .chat-panel. */
+  margin: 1.25rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.875rem;
   background: #ffffff;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
   color: #000000;
-  overflow-y: auto;
+  /* No floating tooltips live in this subtree, so it's safe to clip here to
+     round off the header/footer corners without matching radii on each. */
+  overflow: hidden;
   /* Eases the panel in from the right instead of just snapping into place */
   animation: tile-editor-slide-in 0.18s ease-out;
 }
@@ -923,37 +934,67 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Header matches .chat-panel-header — same gradient, icon chip, and
+   title/subtitle layout, so the two panels read as one family. */
 .tile-editor-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 0.875rem;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-/* Wraps the "Edit style" title + unsaved-changes dot so they sit inline together */
-.tile-editor-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tile-editor-heading h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-/* Small amber dot shown next to the title while there are unsaved edits */
-.tile-editor-unsaved-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f59e0b;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #303035;
+  background: linear-gradient(135deg, #3f3f46, #2b2b30);
+  color: white;
   flex-shrink: 0;
 }
 
-.tile-editor-header button {
+.tile-editor-header-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  background: rgb(74 222 128 / 0.15);
+  color: #4ade80;
+}
+
+.tile-editor-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.tile-editor-header-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+}
+
+.tile-editor-header-subtitle {
+  display: flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  color: rgb(255 255 255 / 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small amber dot shown next to the subtitle while there are unsaved edits */
+.tile-editor-unsaved-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-right: 0.375rem;
+  flex-shrink: 0;
+}
+
+.tile-editor-close {
+  flex-shrink: 0;
   width: 1.75rem;
   height: 1.75rem;
   display: flex;
@@ -961,79 +1002,118 @@ body {
   justify-content: center;
   border: none;
   border-radius: 50%;
-  background: #f4f4f5;
+  background: rgb(255 255 255 / 0.1);
   font-size: 1.125rem;
   cursor: pointer;
-  color: #71717a;
+  color: rgb(255 255 255 / 0.7);
   line-height: 1;
-  transition: background 0.15s ease, transform 0.1s ease;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.tile-editor-header button:hover {
-  background: #e4e4e7;
-  color: #18181b;
+.tile-editor-close:hover {
+  background: rgb(255 255 255 / 0.18);
+  color: white;
   /* Small delight: the close (x) button spins slightly on hover */
   transform: rotate(90deg);
+}
+
+.tile-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  padding: 1.25rem;
+  overflow-y: auto;
 }
 
 /* Info banner explaining default tiles are editable but not deletable */
 .tile-editor-default-note {
   padding: 0.625rem 0.875rem;
   border-radius: 0.625rem;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  color: #075985;
+  background: rgb(74 222 128 / 0.1);
+  border: 1px solid rgb(74 222 128 / 0.3);
+  color: #18181b;
   font-size: 0.75rem;
   line-height: 1.5;
 }
 
+/* Small-caps section label (TITLE / PROMPT) sitting above each field, in the
+   same muted-gray + letter-spacing style used for eyebrow labels elsewhere. */
 .tile-editor-label {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #52525b;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .tile-editor-label input,
 .tile-editor-label textarea {
-  font-weight: normal;
-  padding: 0.625rem 0.75rem;
+  text-transform: none;
+  letter-spacing: normal;
   border: 1px solid #e4e4e7;
-  border-radius: 0.625rem;
-  font-size: 0.875rem;
-  color: #000000;
+  border-radius: 0.75rem;
+  color: #18181b;
   font-family: inherit;
-  resize: vertical;
   background: #fafafa;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Title reads as a name, so it gets a bigger, bolder value than the prompt body */
+.tile-editor-label input {
+  padding: 0.75rem 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.tile-editor-label textarea {
+  padding: 0.875rem;
+  font-size: 0.875rem;
+  font-weight: normal;
+  resize: vertical;
+}
+
+.tile-editor-label input:hover,
+.tile-editor-label textarea:hover {
+  border-color: #d4d4d8;
 }
 
 .tile-editor-label input:focus,
 .tile-editor-label textarea:focus {
   outline: none;
-  border-color: #3f3f46;
+  border-color: #4ade80;
   background: white;
-  /* Soft focus glow ring, in addition to the border color change */
-  box-shadow: 0 0 0 3px rgb(63 63 70 / 0.08);
+  /* Soft green focus glow, matching the app's AI/personalize accent color */
+  box-shadow: 0 0 0 3px rgb(74 222 128 / 0.18);
 }
 
 /* Row above the prompt textarea: "Prompt" label on the left, char count on the right */
 .tile-editor-prompt-label-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
 }
 
+/* Char counter reads as a small pill badge instead of plain trailing text */
 .tile-editor-char-count {
   font-size: 0.6875rem;
-  font-weight: normal;
-  color: #a1a1aa;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #71717a;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 999px;
+  background: #ececec;
 }
 
 .tile-editor-char-count-over {
   color: #dc2626;
+  background: #fee2e2;
 }
 
 .tile-editor-prompt-field {
@@ -1054,8 +1134,10 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid #e4e4e7;
+  background: #fafafa;
 }
 
 .tile-editor-cancel,
@@ -1230,6 +1312,25 @@ body {
   border-bottom-left-radius: 0.25rem;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
+
+/* Same three-dot bounce as .session-loading's tooltip, tinted dark since
+   this bubble sits on a light background instead of a dark one. */
+.chat-typing {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.chat-typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(24 24 27 / 0.35);
+  animation: session-typing-bounce 1.2s infinite ease-in-out;
+}
+.chat-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
 .chat-message-actions {
   display: flex;
