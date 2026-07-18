@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@/types/chat";
+import type { DocumentBlock, PlanHistoryEntry, PlanStepResponse } from "@/types/plan";
 
 export async function requestAIEdit(text: string, instruction: string): Promise<string> {
   const response = await fetch("/api/ai", {
@@ -46,4 +47,42 @@ export async function requestSelectionIntent(selectedText: string, instruction: 
 
   const data = await response.json();
   return data.targetsSelection === true;
+}
+
+export async function requestPlanIntent(instruction: string): Promise<boolean> {
+  const response = await fetch("/api/ai/classify-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instruction }),
+  });
+
+  if (!response.ok) return false; // same fail-safe default as the route: assume a normal single edit
+
+  const data = await response.json();
+  return data.isPlan === true;
+}
+
+const DONE_STEP: PlanStepResponse = {
+  targetIndex: -1,
+  targetText: "",
+  description: "",
+  newText: "",
+  done: true,
+};
+
+export async function requestNextPlanStep(
+  blocks: DocumentBlock[],
+  tilePrompt: string | null,
+  instruction: string,
+  history: PlanHistoryEntry[]
+): Promise<PlanStepResponse> {
+  const response = await fetch("/api/ai/plan-step", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ blocks, tilePrompt, instruction, history }),
+  });
+
+  if (!response.ok) return DONE_STEP; // same fail-safe as the route: stop rather than loop on a broken response
+
+  return response.json();
 }
