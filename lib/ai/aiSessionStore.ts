@@ -8,6 +8,7 @@ type AISessionStore = {
   addSession: (session: AISession) => boolean;
   updateSession: (id: string, patch: Partial<AISession>) => void;
   removeSession: (id: string) => void;
+  clearSessions: () => void;
 };
 
 export const useAISessionStore = create<AISessionStore>((set, get) => ({
@@ -28,6 +29,11 @@ export const useAISessionStore = create<AISessionStore>((set, get) => ({
   removeSession: (id) => {
     set((state) => ({ sessions: state.sessions.filter((s) => s.id !== id) }));
   },
+
+  // Drops every pending session at once — used when the user confirms
+  // leaving the editor tab despite pending suggestions, rather than
+  // resolving them one at a time.
+  clearSessions: () => set({ sessions: [] }),
 }));
 
 // Lets async code (the plan loop) pause until a specific session is

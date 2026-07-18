@@ -372,15 +372,25 @@ body {
 }
 
 .session-tooltip {
-  min-width: 180px;
-  max-width: 300px;
-  padding: 0.5rem;
-  border-radius: 0.875rem;
+  min-width: 220px;
+  max-width: 340px;
+  padding: 0.625rem;
+  border-radius: 1rem;
   background: #2b2b30;
   color: white;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
   z-index: 50;
   font-size: 0.8125rem;
+}
+
+/* The entrance animation lives on this INNER wrapper, not .session-tooltip
+   itself — floating-ui positions .session-tooltip via an inline
+   `transform: translate(x, y)`, and a running CSS animation overrides
+   whatever it's animating (here, transform) for its whole duration. Putting
+   both on the same element meant the real position got silently replaced
+   by the animation's own transform until it finished, which looked like
+   the tooltip appearing at the top-left corner and then jumping into place. */
+.session-tooltip-inner {
   animation: session-tooltip-in 0.15s ease-out;
 }
 
@@ -437,28 +447,66 @@ body {
 }
 
 .session-result-card {
-  padding: 0.625rem;
-  border-radius: 0.625rem;
-  background: rgb(255 255 255 / 0.06);
-  border: 1px solid rgb(255 255 255 / 0.08);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Icon chip + label, same green-accent pattern used in the chat header and
+   tile editor header — gives the card an identity before you read the
+   text, and separates "what is this" from "what does it say." */
+.session-result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.625rem;
+  margin-bottom: 0.75rem;
+  /* Green-tinted so the bar itself reads as clearly separating the label
+     row from the text below, instead of nearly blending into the card */
+  border-bottom: 1px solid rgb(74 222 128 / 0.3);
+}
+
+.session-result-icon {
+  flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgb(74 222 128 / 0.15);
+  color: #4ade80;
+}
+
+.session-result-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.55);
 }
 
 .session-result-text {
-  margin: 0 0 0.625rem;
-  line-height: 1.5;
-  color: rgb(255 255 255 / 0.92);
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: rgb(255 255 255 / 0.95);
 }
 
 .session-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.375rem;
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
 }
 
 .session-accept,
 .session-reject {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.875rem;
+  height: 1.875rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1340,6 +1388,7 @@ body {
    AI accent color; the title/detail split with a divider between them is
    what actually improves readability over one run-on sentence. */
 .chat-plan-update {
+  position: relative;
   display: flex;
   align-self: stretch;
   gap: 0.625rem;
@@ -1349,6 +1398,35 @@ body {
   border-left: 3px solid #4ade80;
   background: #fafafa;
   animation: chat-message-in 0.15s ease-out;
+}
+
+/* When a plan update immediately follows another one (the normal case —
+   the loop posts several of these in a row with no user message between
+   them), a thin connector fills the gap between their icon chips so the
+   run of steps reads as one continuous sequence rather than separate,
+   unrelated cards. Always green, regardless of either card's own accent
+   color (e.g. a "clarify" card's amber), since it marks continuity of the
+   plan itself, not either step's outcome. */
+.chat-plan-update + .chat-plan-update::before {
+  content: "";
+  position: absolute;
+  top: -0.625rem;
+  left: 1.75rem;
+  width: 2px;
+  height: 0.625rem;
+  background: #4ade80;
+}
+
+/* "Clarify" cards ask the user for something, rather than reporting what
+   the AI did, so they get the app's existing amber "needs attention" color
+   (see .tile-editor-unsaved-dot) instead of the standard green. */
+.chat-plan-update-clarify {
+  border-left-color: #f59e0b;
+}
+
+.chat-plan-update-clarify .chat-plan-update-icon {
+  background: rgb(245 158 11 / 0.15);
+  color: #f59e0b;
 }
 
 .chat-plan-update-icon {
@@ -1548,4 +1626,71 @@ body {
 .chat-inline-reject {
   background: rgb(255 255 255 / 0.2);
   color: white;
+}
+
+/* ==========================================================================
+   SWITCH-TAB CONFIRM MODAL — components/layout/SwitchTabConfirmModal.tsx
+   Sits inside the shared .modal-overlay backdrop, but styled like the AI
+   surfaces (dark card, green sparkle chip) instead of the plain white
+   delete-confirmation card, since this warning is specifically about
+   losing AI-suggested edits.
+   ========================================================================== */
+.switch-tab-modal-card {
+  background: #2b2b30;
+  color: white;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+  max-width: 320px;
+  width: 90%;
+  text-align: center;
+}
+
+.switch-tab-modal-title {
+  margin: 0 0 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.switch-tab-modal-message {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.switch-tab-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.switch-tab-modal-cancel,
+.switch-tab-modal-confirm {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.switch-tab-modal-cancel {
+  background: rgb(255 255 255 / 0.1);
+  color: white;
+}
+
+.switch-tab-modal-cancel:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+.switch-tab-modal-confirm {
+  background: #4ade80;
+  color: #052e12;
+}
+
+.switch-tab-modal-confirm:hover {
+  background: #86efac;
 }

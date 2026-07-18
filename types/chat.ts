@@ -3,7 +3,7 @@
 // structured card instead of a plain reply bubble. `content` is still set
 // on these messages too, as a plain-text fallback.
 export type PlanUpdate = {
-  kind: "step" | "skipped" | "paused" | "finished";
+  kind: "step" | "skipped" | "paused" | "finished" | "clarify";
   title: string;
   detail: string;
 };

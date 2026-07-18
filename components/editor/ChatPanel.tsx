@@ -18,7 +18,7 @@ import { getLiveChatGenerationRange } from "@/lib/editor/sessionPositions";
 import { getDocumentBlocks, findBlockRange, findTextRangeAnywhere, narrowToChangedSpan } from "@/lib/editor/documentBlocks";
 import { useAISessionStore, waitForSessionRemoval } from "@/lib/ai/aiSessionStore";
 import { usePlanStore, MAX_PLAN_STEPS } from "@/lib/ai/planStore";
-import { SparkleIcon } from "./ToolbarIcons";
+import { SparkleIcon, InfoIcon } from "./ToolbarIcons";
 
 type Props = { editor: Editor };
 
@@ -67,6 +67,10 @@ export default function ChatPanel({ editor }: Props) {
   const runPlan = async (instruction: string) => {
     usePlanStore.getState().startPlan(instruction);
     let ranOutOfSteps = true;
+    // True only when the AI itself said the instruction didn't give it
+    // enough to work with (see instructionIsSpecific in buildPlanStepPrompt)
+    // — distinct from genuinely running out of sections to change.
+    let wasAmbiguous = false;
 
     for (let stepCount = 0; stepCount < MAX_PLAN_STEPS; stepCount++) {
       const plan = usePlanStore.getState().activePlan;
@@ -82,11 +86,18 @@ export default function ChatPanel({ editor }: Props) {
         const blocks = getDocumentBlocks(editor);
         step = await requestNextPlanStep(blocks, activeTile?.prompt ?? null, instruction, plan.history);
       } finally {
-        editor.setEditable(true);
+        if (!editor.isDestroyed) editor.setEditable(true);
       }
 
+      // This await can span a confirmed tab switch, which ends the plan and
+      // clears its sessions out from under this loop. If that happened,
+      // stop here rather than touching `editor` again — by now it may be
+      // the destroyed instance from before the switch.
+      if (!usePlanStore.getState().activePlan) return;
+
       if (step.targetIndex === -1) {
-        ranOutOfSteps = false; // AI genuinely found nothing left to do
+        ranOutOfSteps = false;
+        wasAmbiguous = !step.instructionIsSpecific;
         break;
       }
 
@@ -177,6 +188,12 @@ export default function ChatPanel({ editor }: Props) {
       // simplest safe option is to keep the chat locked for the whole plan.
       await waitForSessionRemoval(session.id);
 
+      // Same reasoning as above: a confirmed tab switch ends the plan and
+      // clears this exact session, which is also what a normal accept/reject
+      // does — so this wait resolving doesn't by itself mean the user made
+      // a real decision. Bail before reading `editor` again if that's what happened.
+      if (!usePlanStore.getState().activePlan) return;
+
       // Work out accepted vs. rejected by re-reading the same block index
       // rather than tracking live positions — simple, and correct as long
       // as the fallback text-search path above wasn't needed (a known,
@@ -198,18 +215,30 @@ export default function ChatPanel({ editor }: Props) {
     const { history } = usePlanStore.getState().activePlan ?? { history: [] };
     const accepted = history.filter((h) => h.outcome === "accepted").length;
     const skipped = history.filter((h) => h.outcome === "skipped").length;
+    const progress = `${accepted} change(s) applied, ${skipped} skipped.`;
+
+    let title: string;
+    let detail: string;
+    if (wasAmbiguous) {
+      title = "Need a bit more detail";
+      detail =
+        accepted > 0 || skipped > 0
+          ? `Let me know exactly what you'd like changed next and what to change it to, and I'll continue. ${progress}`
+          : "Let me know exactly what you'd like changed and what to change it to, and I'll take it from there.";
+    } else if (ranOutOfSteps) {
+      title = `Stopped after ${MAX_PLAN_STEPS} steps`;
+      detail = progress;
+    } else {
+      title = "Plan finished";
+      detail = progress;
+    }
+
     addMessage({
       id: crypto.randomUUID(),
       role: "assistant",
-      content: ranOutOfSteps
-        ? `Stopped after ${MAX_PLAN_STEPS} steps — ${accepted} change(s) applied, ${skipped} skipped.`
-        : `Plan finished — ${accepted} change(s) applied, ${skipped} skipped.`,
+      content: `${title}. ${detail}`,
       createdAt: Date.now(),
-      planUpdate: {
-        kind: "finished",
-        title: ranOutOfSteps ? `Stopped after ${MAX_PLAN_STEPS} steps` : "Plan finished",
-        detail: `${accepted} change(s) applied, ${skipped} skipped.`,
-      },
+      planUpdate: { kind: wasAmbiguous ? "clarify" : "finished", title, detail },
     });
     usePlanStore.getState().endPlan();
   };
@@ -366,7 +395,7 @@ export default function ChatPanel({ editor }: Props) {
           m.planUpdate ? (
             <div key={m.id} className={`chat-plan-update chat-plan-update-${m.planUpdate.kind}`}>
               <div className="chat-plan-update-icon">
-                <SparkleIcon />
+                {m.planUpdate.kind === "clarify" ? <InfoIcon /> : <SparkleIcon />}
               </div>
               <div className="chat-plan-update-body">
                 <p className="chat-plan-update-title">{m.planUpdate.title}</p>

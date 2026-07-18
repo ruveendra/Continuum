@@ -104,23 +104,32 @@ ${styleSection}The user's overall instruction: "${instruction}"
 The document, numbered into sections:
 ${blockList}
 
-${historySection}Decide ONE next section that still needs a change to satisfy the instruction, or decide none do.
+${historySection}First, decide: is the user's OVERALL instruction, by itself, specific enough to define a concrete edit? This is a property of the instruction's WORDING alone — decide it independently of whether any section still needs changing right now. Two things that do NOT make an instruction unspecific:
+- A deletion/removal instruction (e.g. "remove the duplicate paragraph") is fully specific even though it has no replacement text — the specified change is simply "make this text gone," so newText should just be an empty string.
+- Having already fully satisfied the instruction in earlier steps (see steps already taken, above) is a normal, successful completion — respond with instructionIsSpecific: true and done: true, NOT instructionIsSpecific: false. Running out of matching sections is a different situation from never having known what to do.
+
+An instruction IS unspecific only when it omits a detail you would have to invent yourself to act on it (e.g. "change the word earth" never says what to change it to — there is no way to know the intended replacement without guessing).
+
+Only if the instruction is specific, decide ONE next section that still needs a change to satisfy it, or decide none do.
 
 Respond with ONLY a JSON object — no markdown formatting, no code fences — in exactly this shape:
 {
+  "instructionIsSpecific": <true if the instruction's wording defines a concrete edit — deletions count, and so does an instruction already fully satisfied by prior steps; false ONLY if it omits a detail you'd have to invent>,
   "targetIndex": <the section number to change, or -1 if done>,
   "targetText": "<the EXACT existing text of that section, copied verbatim>",
   "description": "<short plain-language summary, e.g. 'Reword the Introduction to a formal tone'>",
-  "newText": "<the full replacement text for that section>",
-  "done": <true if no more sections need changes, false otherwise>
+  "newText": "<the full replacement text for that section, or an empty string if this step deletes it>",
+  "done": <true if no more sections need changes — whether because the instruction is fully satisfied, or because instructionIsSpecific is false — false otherwise>
 }
 
 Rules:
+- instructionIsSpecific describes the instruction's own wording, never "is there still work left." Successfully finishing every matching section is instructionIsSpecific: true.
+- If instructionIsSpecific is false: set targetIndex to -1, done to true, and leave targetText/newText empty. Do this instead of guessing a replacement, even one that seems reasonable — an incomplete instruction should stop the plan, not be completed on the user's behalf.
 - Propose only ONE section per response, even if several still need changes.
 - Never propose a section already listed above as accepted or rejected.
 - Each line above starts with a "[N] (type)" LABEL we added so you can reference it — that label is NOT part of the document. targetText and newText must start with the actual sentence, never with a "[N]" or "(type)" prefix.
 - targetText must be copied character-for-character from the document content (the part AFTER the label) — not paraphrased.
-- If done is true, the other fields are ignored and can be left empty/-1.`;
+- If done is true, the other fields besides instructionIsSpecific are ignored and can be left empty/-1.`;
 }
 
 // Asks the AI a yes/no question: does this instruction actually want to

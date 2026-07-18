@@ -78,6 +78,7 @@ export async function requestPlanIntent(instruction: string): Promise<boolean> {
 }
 
 const DONE_STEP: PlanStepResponse = {
+  instructionIsSpecific: true,
   targetIndex: -1,
   targetText: "",
   description: "",

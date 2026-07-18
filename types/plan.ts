@@ -18,8 +18,13 @@ export type BlockRange = {
   nodeAttrs: Record<string, unknown>;
 };
 
-// What the AI returns for a single plan step.
+// What the AI returns for a single plan step. `instructionIsSpecific` is
+// answered BEFORE the rest — if the instruction doesn't say enough to
+// determine a concrete edit (e.g. "change the word earth" never says what
+// to change it to), this comes back false and the other fields are empty,
+// rather than the AI inventing the missing detail itself.
 export type PlanStepResponse = {
+  instructionIsSpecific: boolean;
   targetIndex: number;
   targetText: string;
   description: string;

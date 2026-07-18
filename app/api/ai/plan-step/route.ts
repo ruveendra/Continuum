@@ -10,6 +10,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 // broken response as "done" rather than throwing keeps the plan loop from
 // getting stuck on a step it can't make sense of.
 const DONE_STEP: PlanStepResponse = {
+  instructionIsSpecific: true,
   targetIndex: -1,
   targetText: "",
   description: "",
