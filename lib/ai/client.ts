@@ -49,6 +49,21 @@ export async function requestSelectionIntent(selectedText: string, instruction: 
   return data.targetsSelection === true;
 }
 
+export type InsertPosition = "start" | "end" | "cursor";
+
+export async function requestInsertPosition(instruction: string): Promise<InsertPosition> {
+  const response = await fetch("/api/ai/classify-position", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instruction }),
+  });
+
+  if (!response.ok) return "cursor"; // same fail-safe default as the route
+
+  const data = await response.json();
+  return data.position === "start" || data.position === "end" ? data.position : "cursor";
+}
+
 export async function requestPlanIntent(instruction: string): Promise<boolean> {
   const response = await fetch("/api/ai/classify-plan", {
     method: "POST",
@@ -56,7 +71,7 @@ export async function requestPlanIntent(instruction: string): Promise<boolean> {
     body: JSON.stringify({ instruction }),
   });
 
-  if (!response.ok) return false; // same fail-safe default as the route: assume a normal single edit
+  if (!response.ok) return true; // same fail-safe default as the route: search first, don't risk inserting unrelated new content
 
   const data = await response.json();
   return data.isPlan === true;

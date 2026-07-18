@@ -5,9 +5,19 @@ import type { Editor } from "@tiptap/react";
 import { useChatStore } from "@/lib/chat/chatStore";
 import { usePersonalizeStore } from "@/lib/personalize/personalizeStore";
 import { useEditorStore } from "@/lib/editor/editorStore";
-import { requestDocumentGeneration, requestAIEdit, requestSelectionIntent } from "@/lib/ai/client";
-import { insertTextAtCursor, rejectChatGeneration, replaceChatGeneration } from "@/lib/editor/document";
+import {
+  requestDocumentGeneration,
+  requestAIEdit,
+  requestSelectionIntent,
+  requestPlanIntent,
+  requestNextPlanStep,
+  requestInsertPosition,
+} from "@/lib/ai/client";
+import { insertTextAt, rejectChatGeneration, replaceChatGeneration } from "@/lib/editor/document";
 import { getLiveChatGenerationRange } from "@/lib/editor/sessionPositions";
+import { getDocumentBlocks, findBlockRange, findTextRangeAnywhere, narrowToChangedSpan } from "@/lib/editor/documentBlocks";
+import { useAISessionStore, waitForSessionRemoval } from "@/lib/ai/aiSessionStore";
+import { usePlanStore, MAX_PLAN_STEPS } from "@/lib/ai/planStore";
 import { SparkleIcon } from "./ToolbarIcons";
 
 type Props = { editor: Editor };
@@ -27,6 +37,141 @@ export default function ChatPanel({ editor }: Props) {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Drives the whole multi-step plan: ask for one step, locate it, let the
+  // user review it, then ask for the next one — repeating until the AI
+  // says it's done or we hit MAX_PLAN_STEPS. Every step still goes through
+  // the exact same AISession/PinnedSessionTooltip review flow as a manual
+  // selection edit; this function never touches the document directly.
+  const runPlan = async (instruction: string) => {
+    usePlanStore.getState().startPlan(instruction);
+    let ranOutOfSteps = true;
+
+    for (let stepCount = 0; stepCount < MAX_PLAN_STEPS; stepCount++) {
+      const plan = usePlanStore.getState().activePlan;
+      if (!plan) break; // shouldn't happen, but don't loop on nothing
+
+      // Lock the editor only for the network round-trip — this is what
+      // guarantees the document can't drift between the snapshot we send
+      // and the step we get back, so the index-based lookup below can
+      // trust its result instead of falling back to a guess.
+      editor.setEditable(false);
+      let step;
+      try {
+        const blocks = getDocumentBlocks(editor);
+        step = await requestNextPlanStep(blocks, activeTile?.prompt ?? null, instruction, plan.history);
+      } finally {
+        editor.setEditable(true);
+      }
+
+      if (step.targetIndex === -1) {
+        ranOutOfSteps = false; // AI genuinely found nothing left to do
+        break;
+      }
+
+      // Index first (the common, reliable path); exact-text search only as
+      // a fallback if the index didn't line up with what we expected.
+      const range = findBlockRange(editor, step.targetIndex, step.targetText) ?? findTextRangeAnywhere(editor, step.targetText);
+
+      if (!range) {
+        // Couldn't safely locate this step's target — skip it rather than
+        // guess, and immediately ask for the next one instead of stalling.
+        usePlanStore.getState().appendHistory({ description: step.description, outcome: "skipped" });
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Skipped a step — couldn't locate "${step.description}" in the document.`,
+          createdAt: Date.now(),
+        });
+        if (!step.done) continue;
+        ranOutOfSteps = false;
+        break;
+      }
+
+      // Narrow the whole-block range down to just the span that actually
+      // differs — so a one-word change highlights one word, not the whole
+      // paragraph. If there's no real difference, treat it like "nothing
+      // to do here" rather than creating an empty highlight.
+      const changed = narrowToChangedSpan(range, step.targetText, step.newText);
+      if (!changed) {
+        usePlanStore.getState().appendHistory({ description: step.description, outcome: "skipped" });
+        if (!step.done) continue;
+        ranOutOfSteps = false;
+        break;
+      }
+
+      const session = {
+        id: crypto.randomUUID(),
+        from: changed.from,
+        to: changed.to,
+        originalText: changed.originalText,
+        originalNodeType: range.nodeType,
+        originalNodeAttrs: range.nodeAttrs,
+        instruction: step.description,
+        status: "success" as const,
+        resultText: changed.newText,
+        createdAt: Date.now(),
+      };
+
+      if (!useAISessionStore.getState().addSession(session)) {
+        // Hit MAX_SESSIONS (other manual edits are open right now) — stop
+        // here rather than silently drop the rest of the plan.
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Paused the plan — you're at the active-suggestion limit. Resolve one, then ask me to continue.",
+          createdAt: Date.now(),
+        });
+        break;
+      }
+
+      usePlanStore.getState().setCurrentSession(session.id);
+      usePlanStore.getState().setStatus("awaiting-review");
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `Step: ${step.description} — review the highlighted suggestion in the editor.`,
+        createdAt: Date.now(),
+      });
+
+      // Deliberately NOT freeing isLoading here: since planStore only
+      // tracks one activePlan at a time, letting the user fire off a second
+      // handleSend mid-review could start a second plan that overwrites
+      // this one's state while this loop is still suspended below —
+      // simplest safe option is to keep the chat locked for the whole plan.
+      await waitForSessionRemoval(session.id);
+
+      // Work out accepted vs. rejected by re-reading the same block index
+      // rather than tracking live positions — simple, and correct as long
+      // as the fallback text-search path above wasn't needed (a known,
+      // rare rough edge otherwise).
+      const blockAfter = getDocumentBlocks(editor)[step.targetIndex];
+      const outcome: "accepted" | "rejected" =
+        blockAfter && changed.newText.trim() && blockAfter.text.includes(changed.newText.trim())
+          ? "accepted"
+          : "rejected";
+      usePlanStore.getState().appendHistory({ description: step.description, outcome });
+
+      if (step.done) {
+        ranOutOfSteps = false;
+        break;
+      }
+    }
+
+    usePlanStore.getState().setStatus("done");
+    const { history } = usePlanStore.getState().activePlan ?? { history: [] };
+    const accepted = history.filter((h) => h.outcome === "accepted").length;
+    const skipped = history.filter((h) => h.outcome === "skipped").length;
+    addMessage({
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: ranOutOfSteps
+        ? `Stopped after ${MAX_PLAN_STEPS} steps — ${accepted} change(s) applied, ${skipped} skipped.`
+        : `Plan finished — ${accepted} change(s) applied, ${skipped} skipped.`,
+      createdAt: Date.now(),
+    });
+    usePlanStore.getState().endPlan();
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -96,18 +241,27 @@ export default function ChatPanel({ editor }: Props) {
           originalText,
           isReplacingOriginal: true,
         });
+      } else if (await requestPlanIntent(userMessage.content)) {
+        await runPlan(userMessage.content);
       } else {
         const documentText = editor.getText();
-        const { from } = editor.state.selection;
 
-        const resultText = await requestDocumentGeneration(
-          documentText,
-          activeTile?.prompt ?? null,
-          messages,
-          userMessage.content
-        );
+        // Run these together — deciding WHERE to insert doesn't depend on
+        // what gets generated, so there's no reason to wait on one before
+        // starting the other.
+        const [resultText, position] = await Promise.all([
+          requestDocumentGeneration(documentText, activeTile?.prompt ?? null, messages, userMessage.content),
+          requestInsertPosition(userMessage.content),
+        ]);
 
-        insertTextAtCursor(editor, resultText);
+        const from =
+          position === "end"
+            ? editor.state.doc.content.size
+            : position === "start"
+              ? 0
+              : editor.state.selection.from;
+
+        insertTextAt(editor, from, resultText);
 
         const newMessageId = crypto.randomUUID();
         addMessage({

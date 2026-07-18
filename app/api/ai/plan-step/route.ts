@@ -17,6 +17,15 @@ const DONE_STEP: PlanStepResponse = {
   done: true,
 };
 
+// The prompt shows each block prefixed with a "[N] (type)" label so the AI
+// can reference it — despite being told that's a label and not content,
+// models sometimes copy it into targetText/newText anyway. Strip it
+// defensively rather than let a mismatched needle silently fail the block
+// lookup downstream (same spirit as stripping stray code fences below).
+function stripBlockLabelPrefix(text: string): string {
+  return text.replace(/^(\[\d+\]\s*)?\([a-zA-Z]+\)\s*/, "");
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -47,6 +56,8 @@ export async function POST(request: NextRequest) {
       .trim();
 
     const step: PlanStepResponse = JSON.parse(raw);
+    step.targetText = stripBlockLabelPrefix(step.targetText);
+    step.newText = stripBlockLabelPrefix(step.newText);
     return NextResponse.json(step);
   } catch (error) {
     console.error("AI plan-step route error:", error);

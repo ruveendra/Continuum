@@ -83,3 +83,98 @@ export function findTextRangeAnywhere(editor: Editor, targetText: string): Block
 
   return matchCount === 1 ? match : null;
 }
+
+type Token = { text: string; start: number; end: number };
+
+// Splits on whitespace while keeping each word's exact character position —
+// diffing at the WORD level (not character level) means a trimmed span
+// always lands on a word boundary, never mid-word.
+function tokenize(text: string): Token[] {
+  const tokens: Token[] = [];
+  for (const match of text.matchAll(/\S+/g)) {
+    tokens.push({ text: match[0], start: match.index, end: match.index + match[0].length });
+  }
+  return tokens;
+}
+
+// Below this many words in the "changed middle," or below this fraction of
+// matching words in it, we assume it's one localized edit. Above both, it's
+// more likely two-or-more separate word swaps sharing this block — these
+// thresholds are a heuristic judgment call, not an exact science.
+const SCATTERED_MIN_MIDDLE_WORDS = 6;
+const SCATTERED_MATCH_RATIO = 0.5;
+
+// A block-level range covers the WHOLE section, and newText is the whole
+// replacement section — so without this, even a one-word change would
+// highlight and replace the entire paragraph. This finds the smallest
+// word-aligned span that actually differs, trimming off whatever matching
+// words sit at the start and end. If the leftover "changed middle" still
+// contains a long stretch of words that match one-to-one between old and
+// new, that's a sign of multiple separate edits packed into one step —
+// narrowing to that whole stretch would still be misleading, so we fall
+// back to highlighting the entire block instead.
+export function narrowToChangedSpan(
+  range: BlockRange,
+  originalText: string,
+  newText: string
+): { from: number; to: number; originalText: string; newText: string } | null {
+  const origTokens = tokenize(originalText);
+  const newTokens = tokenize(newText);
+
+  let prefixCount = 0;
+  while (
+    prefixCount < origTokens.length &&
+    prefixCount < newTokens.length &&
+    origTokens[prefixCount].text === newTokens[prefixCount].text
+  ) {
+    prefixCount++;
+  }
+
+  const maxSuffixCount = Math.min(origTokens.length, newTokens.length) - prefixCount;
+  let suffixCount = 0;
+  while (
+    suffixCount < maxSuffixCount &&
+    origTokens[origTokens.length - 1 - suffixCount].text === newTokens[newTokens.length - 1 - suffixCount].text
+  ) {
+    suffixCount++;
+  }
+
+  const origMiddleStart = prefixCount;
+  const origMiddleEnd = origTokens.length - 1 - suffixCount; // inclusive
+  const newMiddleStart = prefixCount;
+  const newMiddleEnd = newTokens.length - 1 - suffixCount; // inclusive
+
+  const hasOrigMiddle = origMiddleStart <= origMiddleEnd;
+  const hasNewMiddle = newMiddleStart <= newMiddleEnd;
+
+  if (!hasOrigMiddle && !hasNewMiddle) return null; // same words in the same order — nothing actually changed
+
+  if (hasOrigMiddle && hasNewMiddle) {
+    const origMiddle = origTokens.slice(origMiddleStart, origMiddleEnd + 1);
+    const newMiddle = newTokens.slice(newMiddleStart, newMiddleEnd + 1);
+    const matchCount =
+      origMiddle.length === newMiddle.length
+        ? origMiddle.filter((t, i) => t.text === newMiddle[i].text).length
+        : 0;
+
+    if (
+      origMiddle.length === newMiddle.length &&
+      origMiddle.length > SCATTERED_MIN_MIDDLE_WORDS &&
+      matchCount / origMiddle.length > SCATTERED_MATCH_RATIO
+    ) {
+      return { from: range.from, to: range.to, originalText, newText };
+    }
+  }
+
+  const origStart = hasOrigMiddle ? origTokens[origMiddleStart].start : prefixCount > 0 ? origTokens[prefixCount - 1].end : 0;
+  const origEnd = hasOrigMiddle ? origTokens[origMiddleEnd].end : origStart;
+  const newStart = hasNewMiddle ? newTokens[newMiddleStart].start : prefixCount > 0 ? newTokens[prefixCount - 1].end : 0;
+  const newEnd = hasNewMiddle ? newTokens[newMiddleEnd].end : newStart;
+
+  return {
+    from: range.from + origStart,
+    to: range.from + origEnd,
+    originalText: originalText.slice(origStart, origEnd),
+    newText: newText.slice(newStart, newEnd),
+  };
+}

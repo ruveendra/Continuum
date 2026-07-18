@@ -19,11 +19,13 @@ export async function POST(request: NextRequest) {
     });
 
     const answer = (response.text ?? "").trim().toLowerCase();
-    return NextResponse.json({ isPlan: answer.startsWith("broad") });
+    return NextResponse.json({ isPlan: answer.startsWith("existing") });
   } catch (error) {
     console.error("AI classify-plan route error:", error);
-    // Fail safe: default to a normal single edit, not a multi-step plan —
-    // same reasoning as classify-intent's fail-safe default.
-    return NextResponse.json({ isPlan: false });
+    // Fail safe: default to TRUE (search the document) rather than false.
+    // Wrongly searching just means the plan loop finds nothing and says so;
+    // wrongly skipping the search means inserting unrelated new content
+    // into the document, which is the worse mistake of the two.
+    return NextResponse.json({ isPlan: true });
   }
 }

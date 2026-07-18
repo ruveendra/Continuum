@@ -57,16 +57,22 @@ any earlier instructions into account. Return ONLY the new text to insert —
 no explanations, no preamble, no markdown formatting.`;
 }
 
-// Cheap classifier: decides whether a chat instruction is broad enough to
-// need the multi-step plan flow, or is really just a normal single edit.
-// Kept as its own tiny call (same pattern as buildSelectionIntentPrompt)
-// so a wrong guess here is fast and cheap, not a wasted full generation.
+// Cheap classifier deciding which of two mechanisms should handle a chat
+// instruction with no selection: does it refer to something that ALREADY
+// EXISTS in the document (needs to be located, then edited — the plan
+// loop, whether that ends up being one step or several), or is it asking
+// to write BRAND NEW content (insert-at-cursor)? This is deliberately NOT
+// "is this a big job" — a one-word find-and-replace ("change X to Y")
+// is just as narrow as inserting a sentence, but it still needs the
+// document search the plan loop does, not fresh generation. Kept as its
+// own tiny call (same pattern as buildSelectionIntentPrompt) so a wrong
+// guess here is fast and cheap, not a wasted full generation.
 export function buildPlanIntentPrompt(instruction: string): string {
-  return `A user typed this instruction into a writing assistant's chat: "${instruction}"
+  return `A user typed this instruction into a writing assistant's chat, without selecting any text first: "${instruction}"
 
-Does this instruction ask for a BROAD change likely touching MULTIPLE separate sections of a document (e.g. "make the tone consistent throughout", "reorganize this document", "check all headings for consistency")? Or is it a NARROW request for one piece of new/edited content (e.g. "write an intro paragraph", "make this more formal", "add a conclusion")?
+Does this instruction refer to changing something that ALREADY EXISTS somewhere in the document (e.g. "replace the word X with Y", "fix the typo in the second paragraph", "make the tone consistent throughout", "reorganize this document")? Or is it asking to write BRAND NEW content that isn't there yet (e.g. "write an intro paragraph", "add a conclusion")?
 
-Answer with exactly one word: "broad" or "narrow". If unsure, answer "narrow" — a single edit is the safer default.`;
+Answer with exactly one word: "existing" or "new". If unsure, answer "existing" — it's safer to search the document first than to insert unrelated new content.`;
 }
 
 // Asks the AI for exactly ONE next step in an ongoing plan. It sees the
@@ -112,7 +118,8 @@ Respond with ONLY a JSON object — no markdown formatting, no code fences — i
 Rules:
 - Propose only ONE section per response, even if several still need changes.
 - Never propose a section already listed above as accepted or rejected.
-- targetText must be copied character-for-character from the section list above — not paraphrased.
+- Each line above starts with a "[N] (type)" LABEL we added so you can reference it — that label is NOT part of the document. targetText and newText must start with the actual sentence, never with a "[N]" or "(type)" prefix.
+- targetText must be copied character-for-character from the document content (the part AFTER the label) — not paraphrased.
 - If done is true, the other fields are ignored and can be left empty/-1.`;
 }
 
@@ -130,4 +137,21 @@ ${selectedText}
 They then typed this instruction in a chat: "${instruction}"
 
 Does the instruction intend to modify, rewrite, or change the MEANING of the selected text specifically? Answer with exactly one word: "yes" or "no". If the instruction is about writing something new or unrelated to the selected text, answer "no".`;
+}
+
+// Decides WHERE brand-new content should be inserted, since the instruction
+// itself might specify a position ("at the very bottom", "at the start")
+// instead of leaving it at wherever the cursor happens to be. Deliberately
+// only distinguishes start/end/cursor for now — anything more specific
+// ("after the Methodology section") would need block-index awareness like
+// the plan loop has, which is a separate, bigger piece of work.
+export function buildInsertPositionPrompt(instruction: string): string {
+  return `A user typed this instruction into a writing assistant's chat: "${instruction}"
+
+Does this instruction specify WHERE new content should be inserted in the document? Answer with exactly one word:
+- "end" if it says to add something at the end/bottom of the document
+- "start" if it says to add something at the beginning/top of the document
+- "cursor" if it doesn't specify a position at all
+
+Answer with exactly one word: "end", "start", or "cursor".`;
 }
