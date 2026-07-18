@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import { useChatStore } from "@/lib/chat/chatStore";
 import { usePersonalizeStore } from "@/lib/personalize/personalizeStore";
@@ -37,6 +37,27 @@ export default function ChatPanel({ editor }: Props) {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grows the textarea to fit its content (capped by max-height in CSS,
+  // which switches to a scrollbar beyond that) — resetting height to "auto"
+  // first lets scrollHeight shrink back down when text is removed, not just grow.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  // Keeps the latest message in view — runs whenever a message is added AND
+  // whenever the "thinking" dots appear/disappear, since those change the
+  // scrollable content's height too.
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, isLoading]);
 
   // Drives the whole multi-step plan: ask for one step, locate it, let the
   // user review it, then ask for the next one — repeating until the AI
@@ -82,6 +103,11 @@ export default function ChatPanel({ editor }: Props) {
           role: "assistant",
           content: `Skipped a step — couldn't locate "${step.description}" in the document.`,
           createdAt: Date.now(),
+          planUpdate: {
+            kind: "skipped",
+            title: "Skipped a step",
+            detail: `Couldn't locate "${step.description}" in the document.`,
+          },
         });
         if (!step.done) continue;
         ranOutOfSteps = false;
@@ -121,6 +147,11 @@ export default function ChatPanel({ editor }: Props) {
           role: "assistant",
           content: "Paused the plan — you're at the active-suggestion limit. Resolve one, then ask me to continue.",
           createdAt: Date.now(),
+          planUpdate: {
+            kind: "paused",
+            title: "Plan paused",
+            detail: "You're at the active-suggestion limit. Resolve one, then ask me to continue.",
+          },
         });
         break;
       }
@@ -132,6 +163,11 @@ export default function ChatPanel({ editor }: Props) {
         role: "assistant",
         content: `Step: ${step.description} — review the highlighted suggestion in the editor.`,
         createdAt: Date.now(),
+        planUpdate: {
+          kind: "step",
+          title: step.description,
+          detail: "Review the highlighted suggestion in the editor.",
+        },
       });
 
       // Deliberately NOT freeing isLoading here: since planStore only
@@ -169,6 +205,11 @@ export default function ChatPanel({ editor }: Props) {
         ? `Stopped after ${MAX_PLAN_STEPS} steps — ${accepted} change(s) applied, ${skipped} skipped.`
         : `Plan finished — ${accepted} change(s) applied, ${skipped} skipped.`,
       createdAt: Date.now(),
+      planUpdate: {
+        kind: "finished",
+        title: ranOutOfSteps ? `Stopped after ${MAX_PLAN_STEPS} steps` : "Plan finished",
+        detail: `${accepted} change(s) applied, ${skipped} skipped.`,
+      },
     });
     usePlanStore.getState().endPlan();
   };
@@ -320,22 +361,34 @@ export default function ChatPanel({ editor }: Props) {
         </div>
       </div>
 
-      <div className="chat-panel-messages">
-        {messages.map((m) => (
-          <div key={m.id} className={`chat-message chat-message-${m.role}`}>
-            <div>{m.content}</div>
-            {m.generationStatus === "pending" && (
-              <div className="chat-message-actions">
-                <button type="button" className="chat-accept" onClick={() => handleAccept(m.id)} aria-label="Accept">
-                  ✓
-                </button>
-                <button type="button" className="chat-reject" onClick={() => handleReject(m.id)} aria-label="Reject">
-                  ✕
-                </button>
+      <div className="chat-panel-messages" ref={messagesRef}>
+        {messages.map((m) =>
+          m.planUpdate ? (
+            <div key={m.id} className={`chat-plan-update chat-plan-update-${m.planUpdate.kind}`}>
+              <div className="chat-plan-update-icon">
+                <SparkleIcon />
               </div>
-            )}
-          </div>
-        ))}
+              <div className="chat-plan-update-body">
+                <p className="chat-plan-update-title">{m.planUpdate.title}</p>
+                <p className="chat-plan-update-detail">{m.planUpdate.detail}</p>
+              </div>
+            </div>
+          ) : (
+            <div key={m.id} className={`chat-message chat-message-${m.role}`}>
+              <div>{m.content}</div>
+              {m.generationStatus === "pending" && (
+                <div className="chat-message-actions">
+                  <button type="button" className="chat-accept" onClick={() => handleAccept(m.id)} aria-label="Accept">
+                    ✓
+                  </button>
+                  <button type="button" className="chat-reject" onClick={() => handleReject(m.id)} aria-label="Reject">
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        )}
         {isLoading && (
           <div className="chat-message chat-message-assistant">
             <div className="chat-typing">
@@ -348,8 +401,9 @@ export default function ChatPanel({ editor }: Props) {
       </div>
 
       <div className="chat-panel-input">
-        <input
-          type="text"
+        <textarea
+          ref={inputRef}
+          rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
@@ -361,7 +415,11 @@ export default function ChatPanel({ editor }: Props) {
           }
           disabled={isLoading}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
+            // Enter sends; Shift+Enter inserts a line break instead.
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
           }}
         />
         <button
