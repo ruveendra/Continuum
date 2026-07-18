@@ -8,6 +8,7 @@ type AISessionStore = {
   addSession: (session: AISession) => boolean;
   updateSession: (id: string, patch: Partial<AISession>) => void;
   removeSession: (id: string) => void;
+  clearSessions: () => void;
 };
 
 export const useAISessionStore = create<AISessionStore>((set, get) => ({
@@ -28,4 +29,25 @@ export const useAISessionStore = create<AISessionStore>((set, get) => ({
   removeSession: (id) => {
     set((state) => ({ sessions: state.sessions.filter((s) => s.id !== id) }));
   },
+
+  // Drops every pending session at once — used when the user confirms
+  // leaving the editor tab despite pending suggestions, rather than
+  // resolving them one at a time.
+  clearSessions: () => set({ sessions: [] }),
 }));
+
+// Lets async code (the plan loop) pause until a specific session is
+// resolved — accepted or rejected, doesn't matter which, both paths end
+// with removeSession(id). Deliberately doesn't touch PinnedSessionTooltip's
+// accept/reject handlers at all; it just watches the store for the session
+// to disappear.
+export function waitForSessionRemoval(sessionId: string): Promise<void> {
+  return new Promise((resolve) => {
+    const unsubscribe = useAISessionStore.subscribe((state) => {
+      if (!state.sessions.some((s) => s.id === sessionId)) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}

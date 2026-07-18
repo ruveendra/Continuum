@@ -49,13 +49,14 @@ export function applySessionAccept(editor: Editor, session: AISession) {
   }
 }
 
-export function insertTextAtCursor(editor: Editor, text: string) {
-  const { from } = editor.state.selection;
-
+// Takes an explicit position rather than always reading the cursor —
+// callers decide WHERE (cursor, start, end, ...) based on what the
+// instruction actually asked for; see requestInsertPosition in client.ts.
+export function insertTextAt(editor: Editor, pos: number, text: string) {
   editor
     .chain()
     .focus()
-    .insertContentAt(from, text)
+    .insertContentAt(pos, text)
     .run();
 }
 
